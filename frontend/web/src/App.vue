@@ -120,6 +120,11 @@ async function changeFolder(folder: Folder): Promise<void> {
   try { const detail = await api.changeMessage(selected.value.summary.entryId, { version: selected.value.summary.version, folder }); selected.value = detail; replaceSummary(detail.summary); await refreshSidebar(); notice.value = `已移至${folderLabels[folder]}。` }
   catch (failure) { fail(failure) }
 }
+async function changeRead(read: boolean): Promise<void> {
+  if (!selected.value) return; clearFeedback()
+  try { const detail = await api.changeMessage(selected.value.summary.entryId, { version: selected.value.summary.version, read }); selected.value = detail; replaceSummary(detail.summary); await refreshSidebar(); notice.value = read ? '已标为已读。' : '已标为未读。' }
+  catch (failure) { fail(failure) }
+}
 async function assignCategory(event: Event): Promise<void> {
   if (!selected.value) return; const value = (event.target as HTMLSelectElement).value; clearFeedback()
   try { const body = value ? { version: selected.value.summary.version, categoryId: value } : { version: selected.value.summary.version, clearCategory: true }; selected.value = await api.changeMessage(selected.value.summary.entryId, body); replaceSummary(selected.value.summary); await refreshSidebar() }
@@ -204,7 +209,7 @@ onBeforeUnmount(() => { window.removeEventListener('popstate', onPop); window.re
       <article class="pane reader-pane" aria-live="polite">
         <div v-if="!selected && !editing" class="reader-empty"><span aria-hidden="true">𓅱</span><h2>万里归鸿</h2><p>从左侧选择一封邮件，或开始写信。</p></div>
         <section v-if="selected" class="message-detail">
-          <div class="reader-actions"><button type="button" @click="derive('REPLY')">回复</button><button type="button" @click="derive('REPLY_ALL')">全部回复</button><button type="button" @click="derive('FORWARD')">转发</button><button type="button" @click="changeFolder('ARCHIVE')">归档</button><button type="button" @click="changeFolder('SPAM')">垃圾邮件</button><button type="button" @click="changeFolder('TRASH')">删除</button></div>
+          <div class="reader-actions"><button type="button" @click="derive('REPLY')">回复</button><button type="button" @click="derive('REPLY_ALL')">全部回复</button><button type="button" @click="derive('FORWARD')">转发</button><button type="button" @click="changeRead(!selected.summary.read)">{{ selected.summary.read ? '标为未读' : '标为已读' }}</button><button type="button" @click="changeFolder('ARCHIVE')">归档</button><button type="button" @click="changeFolder('SPAM')">垃圾邮件</button><button type="button" @click="changeFolder('TRASH')">删除</button><button v-if="selected.summary.folder !== 'INBOX'" type="button" @click="changeFolder('INBOX')">恢复到收件箱</button></div>
           <header class="mail-header"><p class="eyebrow">{{ folderLabels[selected.summary.folder] }}</p><h1>{{ selected.summary.subject || '（无主题）' }}</h1><p><strong>{{ selected.summary.fromName || selected.summary.fromAddress }}</strong> &lt;{{ selected.summary.fromAddress }}&gt;</p><p class="recipients">收件人：{{ selected.recipients.filter(r => r.kind === 'TO').map(r => r.address).join(', ') || '未提供' }}</p><time>{{ new Date(selected.summary.sentAt || selected.summary.receivedAt).toLocaleString('zh-CN') }}</time>
             <label class="category-select">分类<select :value="selected.summary.categoryId || ''" @change="assignCategory"><option value="">未分类</option><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
           </header>

@@ -19,6 +19,10 @@ func main() {
 			panic(err)
 		}
 		mailboxhttp.Register(mux, runtime, identity)
+		mailboxRepository := infrastructure.NewMailboxRepository(runtime.Database, runtime.Witness, runtime.Writable)
+		mailbox := application.NewMailbox(mailboxRepository, infrastructure.MIMEParser{}, infrastructure.ConservativeHTML{}, runtime.Objects)
+		mailboxhttp.RegisterMailbox(mux, runtime, identity, mailbox)
+		mailboxhttp.RegisterWeb(mux, "backend/mailbox-service/src/main/resources/static")
 	}, nil)
 	if err != nil {
 		log.Fatal(err)
