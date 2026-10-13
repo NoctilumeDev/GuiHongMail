@@ -12,4 +12,4 @@ Broker 单 CPU、512 MiB、128 PID 的预算保持；JVM 显式感知 1 CPU，�
 
 资源 watchdog 每 5 秒保存全机与各具名应用 RSS；全机连续三次大于 14 GiB、任一应用 RSS 大于 384 MiB 时停止精确 owned 实验，保留数据库、对象卷和库外 witness。各执行窗口最长 3600 秒，可在下一明确窗口继续，不构成计划任务。
 
-组件 profile 修订 1.2：首次逐容器补采显示 Broker 约 313.9 MiB / 512 MiB、121 / 128 PIDs；这是 PID 余量不合格，原 foundation/S3 结果仅保留为部分证据。保持 512 MiB 与 128 PID 上限，关闭首轮不使用的 Lite Pull、Lite Event、账户统计、广播 offset 存储及详细统计；经典 Consumer、同步刷盘、TimerWheel 和三档 Delivery 重试保持。诊断环境观察到 Broker 降至 107 PIDs 后，仍须在新源码、完整拓扑和真实 MQ 探针下按逐容器 watchdog 重新资格化，诊断值本身不构成 PASS。
+组件 profile 修订 1.2：首次逐容器补采显示 Broker 约 313.9 MiB / 512 MiB、121 / 128 PIDs；这是 PID 余量不合格，原 foundation/S3 结果仅保留为部分证据。保持 512 MiB 与 128 PID 上限，关闭首轮不使用的 Lite Pull、Lite Event、账户统计、广播 offset 存储及详细统计；经典 Consumer、同步刷盘、TimerWheel 和三档 Delivery 重试保持。诊断环境空闲态降至 107 PIDs，但真实 MQ 探针使其达到 113、只剩 15，仍触发新停止线。Broker 单 CPU profile 因此关闭分层编译并固定一个 JIT compiler thread，不改变消息语义或持久性；必须在新源码、完整拓扑和真实 MQ 探针下按相同 watchdog 重新资格化，诊断值本身不构成 PASS。
