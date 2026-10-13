@@ -196,7 +196,11 @@ func securityHeaders(next http.Handler) http.Handler {
 		writer.Header().Set("X-Content-Type-Options", "nosniff")
 		writer.Header().Set("X-Frame-Options", "DENY")
 		writer.Header().Set("Referrer-Policy", "no-referrer")
-		writer.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		if strings.HasPrefix(request.URL.Path, "/api/") || strings.HasPrefix(request.URL.Path, "/internal/") || strings.HasPrefix(request.URL.Path, "/health/") {
+			writer.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
+		} else {
+			writer.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'")
+		}
 		writer.Header().Set("Cache-Control", "no-store")
 		next.ServeHTTP(writer, request)
 	})

@@ -15,6 +15,7 @@ import apps
 import lab
 
 GO = Path('D:/DevTools/Go/go1.27.2/bin/go.exe')
+NPM = Path('D:/Node.js/current/npm.cmd')
 PORTS = {'mailbox': 18080, 'ingress': 18081, 'delivery': 18082}
 COMMANDS = {'mailbox': './cmd/mailbox', 'ingress': './cmd/ingress', 'delivery': './cmd/delivery'}
 PROCESSES = lab.LAB / 'go-applications'
@@ -98,6 +99,13 @@ def build():
     log_path = attempt / 'build.log'
     artifacts = []
     with log_path.open('xb') as output:
+        frontend = lab.ROOT / 'frontend/web'
+        for command in (['ci', '--ignore-scripts', '--proxy', 'http://127.0.0.1:7897',
+                         '--https-proxy', 'http://127.0.0.1:7897'], ['test'], ['run', 'build']):
+            result = subprocess.run([str(NPM), *command], cwd=frontend, env=environment(network=True),
+                                    stdout=output, stderr=subprocess.STDOUT, timeout=300)
+            if result.returncode:
+                raise RuntimeError('Frontend build gate failed; retained ' + str(log_path))
         for command in (['test', './...'], ['vet', './...']):
             result = subprocess.run([str(GO), *command], cwd=lab.ROOT, env=environment(),
                                     stdout=output, stderr=subprocess.STDOUT, timeout=300)
@@ -114,10 +122,17 @@ def build():
             artifacts.append({'role': role, 'path': executable.relative_to(lab.ROOT).as_posix(),
                               'bytes': executable.stat().st_size,
                               'sha256': hashlib.sha256(executable.read_bytes()).hexdigest()})
+    static = lab.ROOT / 'backend/mailbox-service/src/main/resources/static'
+    frontend_assets = [{'path': path.relative_to(lab.ROOT).as_posix(), 'bytes': path.stat().st_size,
+                        'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+                       for path in sorted(static.rglob('*')) if path.is_file()]
+    if not frontend_assets:
+        raise RuntimeError('Frontend production build emitted no assets')
     receipt = {'schema': 'GuiHongGoBuildReceipt/1.0', 'source_sha': source, 'exit_code': 0,
                'go_version': subprocess.check_output([str(GO), 'version'], text=True).strip(),
                'go_sum_sha256': hashlib.sha256((lab.ROOT / 'go.sum').read_bytes()).hexdigest(),
-               'log': log_path.relative_to(lab.ROOT).as_posix(),
+               'frontend_lock_sha256': hashlib.sha256((lab.ROOT / 'frontend/web/package-lock.json').read_bytes()).hexdigest(),
+               'frontend_assets': frontend_assets, 'log': log_path.relative_to(lab.ROOT).as_posix(),
                'log_sha256': hashlib.sha256(log_path.read_bytes()).hexdigest(), 'artifacts': artifacts}
     receipt_path = root / 'receipt.json'
     lab.write_new(receipt_path, json.dumps(receipt, indent=2, sort_keys=True) + '\n')
@@ -132,6 +147,18 @@ def verified_build(source):
         raise RuntimeError('Go build receipt does not bind exact source')
     if receipt.get('go_sum_sha256') != hashlib.sha256((lab.ROOT / 'go.sum').read_bytes()).hexdigest():
         raise RuntimeError('Go dependency lock changed after build')
+    if receipt.get('frontend_lock_sha256') != hashlib.sha256((lab.ROOT / 'frontend/web/package-lock.json').read_bytes()).hexdigest():
+        raise RuntimeError('Frontend dependency lock changed after build')
+    for row in receipt.get('frontend_assets', []):
+        path = (lab.ROOT / row.get('path', '')).resolve()
+        static = (lab.ROOT / 'backend/mailbox-service/src/main/resources/static').resolve()
+        if (not path.is_relative_to(static) or path.stat().st_size != row.get('bytes')
+                or hashlib.sha256(path.read_bytes()).hexdigest() != row.get('sha256')):
+            raise RuntimeError('Frontend asset binding mismatch')
+    actual_frontend = {path.relative_to(lab.ROOT).as_posix() for path in static.rglob('*') if path.is_file()}
+    receipted_frontend = {row.get('path') for row in receipt.get('frontend_assets', [])}
+    if actual_frontend != receipted_frontend or not actual_frontend:
+        raise RuntimeError('Frontend asset set mismatch')
     log_path = lab.ROOT / receipt['log']
     if hashlib.sha256(log_path.read_bytes()).hexdigest() != receipt['log_sha256']:
         raise RuntimeError('Go build log digest mismatch')
