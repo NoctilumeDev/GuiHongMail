@@ -1,7 +1,7 @@
 {
   "schema": "GuiHongGoEnvironmentLock/1.0",
   "recorded_at": "2026-10-13",
-  "status": "PREFLIGHT_SELECTED_NOT_QUALIFIED",
+  "status": "GO_RUNTIME_PREFLIGHT_PASS_M1G_IMPLEMENTATION_AUTHORIZED",
   "go": {
     "version": "go1.27.2",
     "os_arch": "windows/amd64",
@@ -15,7 +15,7 @@
     "version": "v2.1.2",
     "tag_commit": "7eedaf948c6076c716972724782f4837e1f9caa6",
     "protocol": "RocketMQ Remoting",
-    "qualification": "PENDING_REAL_PROBE"
+    "qualification": "M1G_PASS"
   },
   "server_baseline": {
     "rocketmq": "5.5.0",
@@ -23,9 +23,18 @@
     "proxy_allowed": false,
     "contract": "docs/m1-resource-contract-1.1.md"
   },
+  "qualification": {
+    "source_sha": "e33e80b6c97116057184ba04b0b50f188095381e",
+    "pass_run": "guihong-m1g-3410087aaf4b4a9aaf590cb20c7c3a50",
+    "pass_plan_sha256": "9d5416aab2ce793cd4343837e6a1e6b3bce3dd4f455497d631630d5f0348490e",
+    "pass_bundle_manifest_sha256": "05b5ece025c03459bbc77b2ad4f4bb312f8490e6d46229f00a9bc0a5b00d2daa",
+    "wrong_hash_run": "guihong-m1g-0d3631cb403c4802aec7106c226c3e37",
+    "wrong_hash_verdict": "FAIL",
+    "boundary": "GO_RUNTIME_PREFLIGHT_ONLY"
+  },
   "notes": [
     "The official RocketMQ 5.x Go gRPC SDK requires Proxy and is outside this topology.",
-    "Module selection and a successful build are not compatibility qualification.",
+    "Module selection and a successful build were not treated as compatibility qualification; M1G used a real lifecycle and resource window.",
     "Transitive module checksums are authoritative only after committed go.sum and clean-source verification."
   ]
 }
