@@ -10,6 +10,25 @@ from unittest.mock import patch
 
 import apps
 import lab
+import resource_guard
+
+
+class ContainerBudgetTest(unittest.TestCase):
+    def test_docker_memory_units_are_converted_without_treating_host_total_as_container_use(self):
+        self.assertEqual(313 * 1024**2 + int(.9 * 1024**2), resource_guard.parse_size('313.9MiB'))
+        self.assertEqual(153300000, resource_guard.parse_size('153.3MB'))
+        with self.assertRaisesRegex(RuntimeError, 'Unsupported Docker resource size'):
+            resource_guard.parse_size('61.3%')
+
+    def test_container_pid_and_memory_headroom_are_hard_resource_witnesses(self):
+        healthy = {'running': True, 'oom_killed': False, 'memory_headroom_ratio': .10, 'pid_headroom': 16}
+        self.assertIsNone(resource_guard.container_violation([healthy]))
+        self.assertEqual('CONTAINER_PID_HEADROOM_STOP_LINE',
+                         resource_guard.container_violation([{**healthy, 'pid_headroom': 15}]))
+        self.assertEqual('CONTAINER_MEMORY_HEADROOM_STOP_LINE',
+                         resource_guard.container_violation([{**healthy, 'memory_headroom_ratio': .099}]))
+        self.assertEqual('CONTAINER_OOM_STOP_LINE',
+                         resource_guard.container_violation([{**healthy, 'oom_killed': True}]))
 
 
 class BuildReceiptTest(unittest.TestCase):

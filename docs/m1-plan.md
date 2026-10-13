@@ -8,6 +8,8 @@ Windows 11 开发机，15.78 GiB 可用物理内存。Docker Linux 引擎；中�
 
 启动完整实验前空闲内存至少 4 GiB，C 盘至少 10 GiB；总占用大于 14 GiB 连续三次（每 5 秒）即保存事实、停止本次 owned 实验。单次只运行一个 full lab，最多两个竞争参与者；构建与重型探针串行。中间件容器硬上限：MySQL 512 MiB、SeaweedFS 256 MiB、NameServer 192 MiB、Broker 512 MiB；每个应用 JVM heap 192 MiB，单应用 RSS 超过 384 MiB 停止实验。全机停止线优先于这些局部上限，不上调以掩盖 OOM。
 
+资源资格不能从宿主机总占用倒推中间件占用。watchdog 每 5 秒同时保存四个运行中容器各自的实际 memory/PID、硬上限、余量、OOM 状态，以及三个 owned 应用的 RSS；任一容器剩余内存低于其上限的 10%，或 PID 余量低于 16，均保留首个样本并停止本轮。M1 聚合必须读回四个具名容器，且至少一个子门窗口连续 6 个样本同时看到四个依赖和三个业务 JVM，证明完整拓扑持续至少 25 秒。该窗口只证明 M1 有界基础负载，不替代 M5 故障压力和 M6 回归。
+
 项目标识必须匹配 `guihong-[a-z0-9-]+`；所有容器、卷、网络带 owner 和 run 标记。清理只允许精确名称及标签匹配；不执行 prune，不删除已存在的共享镜像。数据库、对象数据与库外 witness 使用三个不同持久位置；实际凭据、用户会话与本机日志在忽略的 `.artifacts` 内。
 
 服务只监听回环：Mailbox 18080、Ingress 管理 18081 / SMTP 12525、Delivery 18082。独立 MySQL 容器映射 13306；SeaweedFS 仅映射 S3 19833，其 master/filer/volume/gRPC、WebDAV、Admin/IAM 不向宿主应用开放。MQ NameServer 19876、Broker 20911，仅回环；不增加 Proxy 进程。

@@ -145,10 +145,18 @@ def prepare():
         root=lab.LAB/'witness'/role
         if root.exists():raise RuntimeError('Witness already exists; no reset/adopt operation')
         db=credentials['database'][role]
-        with pymysql.connect(host='127.0.0.1',port=13306,user=db['user'],password=db['password'],database=db['schema'],connect_timeout=5) as c:
-            with c.cursor() as q:
-                q.execute('SHOW TABLES');tables=q.fetchall()
-                q.execute('SELECT DATABASE(),CURRENT_USER(),VERSION()');binding=q.fetchone()
+        deadline=time.monotonic()+60
+        while True:
+            try:
+                with pymysql.connect(host='127.0.0.1',port=13306,user=db['user'],password=db['password'],database=db['schema'],connect_timeout=5) as c:
+                    with c.cursor() as q:
+                        q.execute('SHOW TABLES');tables=q.fetchall()
+                        q.execute('SELECT DATABASE(),CURRENT_USER(),VERSION()');binding=q.fetchone()
+                break
+            except pymysql.err.OperationalError as error:
+                code=error.args[0] if error.args else None
+                if code not in {2003,2013} or time.monotonic()>=deadline:raise
+                time.sleep(.5)
         if tables:raise RuntimeError('Bootstrap refused for a non-virgin schema')
         observations.append({'service':role,'schema':binding[0],'database_identity':binding[1],'version':binding[2],'tables':[]})
     # No filesystem authority is created until all three independent schemas are known virgin.

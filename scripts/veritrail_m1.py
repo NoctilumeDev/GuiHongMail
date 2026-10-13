@@ -16,6 +16,7 @@ from veritrail.canonical import sha256_json
 
 import apps
 import lab
+import resource_guard
 
 ROOT = lab.ROOT
 RUN_PATTERN = re.compile(r'guihong-[a-z0-9-]{1,100}')
@@ -100,6 +101,24 @@ def inspect_resource(name, child_epochs):
         raise RuntimeError('Empty resource evidence')
     epochs = [row['utc_epoch'] for row in rows]
     rss_values = [process['rss_bytes'] for row in rows for process in row['processes']]
+    containers = [container for row in rows for container in row.get('containers', [])]
+    running_containers = [container for container in containers if container['running']]
+    consecutive_full = maximum_full = 0
+    for row in rows:
+        consecutive_full = consecutive_full + 1 if row.get('full_topology') else 0
+        maximum_full = max(maximum_full, consecutive_full)
+    peaks = {}
+    for service in resource_guard.INFRASTRUCTURE:
+        observed = [row for row in running_containers if row['service'] == service]
+        peaks[service] = {
+            'samples': len(observed),
+            'memory_limit_bytes': observed[0]['memory_limit_bytes'] if observed else None,
+            'max_memory_usage_bytes': max((row['memory_usage_bytes'] for row in observed), default=None),
+            'max_memory_utilization_ratio': max((row['memory_usage_bytes'] / row['memory_limit_bytes'] for row in observed), default=None),
+            'pids_limit': observed[0]['pids_limit'] if observed else None,
+            'max_pids': max((row['pids'] for row in observed), default=None),
+            'min_pid_headroom': min((row['pid_headroom'] for row in observed), default=None),
+        }
     return {
         'file': name,
         'sha256': sha_file(path),
@@ -108,6 +127,14 @@ def inspect_resource(name, child_epochs):
         'max_host_used_bytes': max(row['memory']['used_bytes'] for row in rows),
         'max_application_rss_bytes': max(rss_values, default=0),
         'application_roles_seen': sorted({process['role'] for row in rows for process in row['processes']}),
+        'container_roles_seen': sorted({container['service'] for container in running_containers}),
+        'container_peaks': peaks,
+        'container_memory_headroom_ok': bool(running_containers) and all(
+            row['memory_headroom_ratio'] >= resource_guard.MIN_CONTAINER_MEMORY_HEADROOM_RATIO for row in running_containers),
+        'container_pid_headroom_ok': bool(running_containers) and all(
+            row['pid_headroom'] >= resource_guard.MIN_CONTAINER_PID_HEADROOM for row in running_containers),
+        'container_oom_free': bool(containers) and all(not row['oom_killed'] for row in containers),
+        'max_consecutive_full_topology_samples': maximum_full,
         'covers_child_evidence': bool(child_epochs) and min(epochs) <= min(child_epochs) and max(child_epochs) <= max(epochs) + 10,
     }
 
@@ -171,7 +198,7 @@ def main():
             'm1_plan': 'docs/m1-plan.md', 'm1_components': 'docs/m1-components.md',
             'environment_lock': 'docs/environment-lock.json', 'ci': '.github/workflows/ci.yml'}.items()},
     }
-    spec = {'id': 'm1-local-observation', 'contract': {'id': 'guihong-m1-local', 'version': '1.0'},
+    spec = {'id': 'm1-local-observation', 'contract': {'id': 'guihong-m1-local', 'version': '1.1'},
             'evidence_type': 'guihong.m1', 'coordinates': request,
             'projections': ['source_sha', 'contracts', 'core', 'children', 'resources', 'build', 'gates', 'cleanup', 'boundary'],
             'canonicalization_profile': 'veritrail-json-c14n/1'}
@@ -205,11 +232,17 @@ def main():
             hard(name + '-resource-stop', 'resources/' + name + '/stop_reasons', []),
             hard(name + '-resource-host', 'resources/' + name + '/host_under_stop_line', True),
             hard(name + '-resource-rss', 'resources/' + name + '/applications_under_stop_line', True),
+            hard(name + '-container-roles', 'resources/' + name + '/container_roles_seen', list(resource_guard.INFRASTRUCTURE)),
+            hard(name + '-container-memory', 'resources/' + name + '/container_memory_headroom_ok', True),
+            hard(name + '-container-pids', 'resources/' + name + '/container_pid_headroom_ok', True),
+            hard(name + '-container-oom', 'resources/' + name + '/container_oom_free', True),
             hard(name + '-resource-time', 'resources/' + name + '/covers_child_evidence', True),
         ])
     assertions.append(hard('application-resource-witness', 'resources/application_roles_seen', sorted(lab.SERVICES)))
+    assertions.append(hard('infrastructure-resource-witness', 'resources/infrastructure_roles_seen', list(resource_guard.INFRASTRUCTURE)))
+    assertions.append(hard('sustained-full-topology', 'resources/full_topology_sustained', True))
     plan = seal_acceptance_plan({
-        'plan_kind': 'ACCEPTANCE', 'schema_version': '0.1', 'plan_id': 'guihong-m1-local', 'version': 1,
+        'plan_kind': 'ACCEPTANCE', 'schema_version': '0.1', 'plan_id': 'guihong-m1-local', 'version': 2,
         'subject': {'id': 'guihong-m1-' + args.mode, 'version': source, 'source_ref': 'github:NoctilumeDev/GuiHongMail'},
         'question': 'Do all finite M1 local child, build, architecture, resource and public-Core gates reconcile for the exact source?',
         'governance': {'claim_owner_ref': 'human:repository-owner', 'drafter_ref': 'guihong:m1-reconciler',
@@ -249,6 +282,9 @@ def main():
             facts['resources'][name] = resource
             del facts['children'][name]['captured_epochs']
         facts['resources']['application_roles_seen'] = sorted({role for name in CHILDREN for role in facts['resources'][name]['application_roles_seen']})
+        facts['resources']['infrastructure_roles_seen'] = sorted({role for name in CHILDREN for role in facts['resources'][name]['container_roles_seen']})
+        facts['resources']['full_topology_sustained'] = max(
+            facts['resources'][name]['max_consecutive_full_topology_samples'] for name in CHILDREN) >= 6
         facts['build'] = inspect_build(source)
         facts['gates'] = {
             'static': run_gate([sys.executable, '-B', str(ROOT / 'scripts/check.py'), 'all'], out / 'static-gate.log'),
@@ -268,10 +304,10 @@ def main():
                 'plan_digest': plan['seal']['digest'], 'observation_spec_digest': observation_spec_digest(spec),
                 'request_seal_digest': sha256_json(request), 'collection_session_id': run,
                 'collector_role': 'guihong-m1-reconciler', 'coverage': 'COMPLETE' if status == 'COMPLETED' else 'ERROR',
-                'normalization_semantics_version': 'guihong-m1/1.0', 'facts_digest': sha256_json(facts)}
+                'normalization_semantics_version': 'guihong-m1/1.1', 'facts_digest': sha256_json(facts)}
     if args.control == 'wrong-binding':
         metadata['plan_digest'] = '0' * 64
-    evidence = {'schema_version': '0.1', 'evidence_type': spec['evidence_type'], 'source': 'guihong-m1/1.0',
+    evidence = {'schema_version': '0.1', 'evidence_type': spec['evidence_type'], 'source': 'guihong-m1/1.1',
                 'captured_at': datetime.now(timezone.utc).isoformat(), 'facts': facts,
                 'metadata': {'veritrail_observation': metadata}}
     save(out / 'evidence.json', evidence)
