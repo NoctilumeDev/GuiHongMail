@@ -40,7 +40,9 @@ def docs():
     for rel in REQUIRED:
         if not (ROOT/rel).is_file():
             errors.append('missing required contract: '+rel)
-    for rel in sorted(set(REQUIRED + contract_files())):
+    tracked = subprocess.check_output(['git','ls-files','-z'],cwd=ROOT).decode().split('\0')
+    stage_docs = [p for p in tracked if p.startswith('docs/') and p.endswith('.md')]
+    for rel in sorted(set(REQUIRED + contract_files() + stage_docs)):
         p = ROOT/rel
         if not p.is_file():
             errors.append('missing seal input: '+rel)

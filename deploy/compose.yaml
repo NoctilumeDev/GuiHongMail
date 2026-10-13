@@ -1,0 +1,73 @@
+name: ${GUIHONG_LAB_ID:?run id required}
+services:
+  mysql:
+    image: mysql@sha256:870634c634aae968ea1a93e5c094a14e00c692da2ee9bed956b3dfcc7bd08cb0
+    platform: linux/amd64
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql-root
+    command: ['--innodb-buffer-pool-size=134217728', '--performance-schema=OFF', '--max-connections=30', '--mysqlx=OFF', '--innodb-flush-log-at-trx-commit=1', '--sync-binlog=1']
+    ports: ['127.0.0.1:13306:3306']
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ${GUIHONG_LAB_DIR:?private lab root required}/mysql-root:/run/secrets/mysql-root:ro
+      - ${GUIHONG_LAB_DIR}/mysql-init.sql:/docker-entrypoint-initdb.d/001-guihong.sql:ro
+    networks: [database]
+  seaweedfs:
+    image: chrislusf/seaweedfs@sha256:aba492e2a4e4c90bff795745e8e660affa1f09e7650f5981bd7bccd1a06cd931
+    platform: linux/amd64
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 128
+    command: ['mini', '-dir=/data', '-ip=127.0.0.1', '-ip.bind=0.0.0.0', '-master.telemetry=false', '-master.volumeSizeLimitMB=64', '-volume.max=16', '-volume.fileSizeLimitMB=5', '-volume.concurrentUploadLimitMB=10', '-volume.concurrentDownloadLimitMB=10', '-s3.config=/config/s3.json', '-bucket=guihong-mailbox,guihong-ingress,guihong-delivery', '-webdav=false', '-admin.ui=false', '-s3.iam=false', '-s3.port.iceberg=0', '-s3.port.lance=0', '-s3.concurrentUploadLimitMB=10', '-s3.concurrentFileUploadLimit=2', '-s3.readerCacheSizeMB=16', '-s3.allowDeleteBucketNotEmpty=false', '-s3.autoCreateBucket=false']
+    ports: ['127.0.0.1:19833:8333']
+    volumes:
+      - object-data:/data
+      - ${GUIHONG_LAB_DIR}/s3.json:/config/s3.json:ro
+    networks: [storage]
+  namesrv:
+    image: apache/rocketmq@sha256:a613f1341f3404b96900cf11e5c35f2d049c103504a1dd60242a04cebf5be467
+    platform: linux/amd64
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+    mem_limit: 192m
+    cpus: 1.0
+    pids_limit: 128
+    environment:
+      JAVA_OPT_EXT: '-Xms64m -Xmx96m -XX:MaxDirectMemorySize=32m'
+    command: ['sh', 'mqnamesrv']
+    ports: ['127.0.0.1:19876:9876']
+    networks: [mq]
+  broker:
+    image: apache/rocketmq@sha256:a613f1341f3404b96900cf11e5c35f2d049c103504a1dd60242a04cebf5be467
+    platform: linux/amd64
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 128
+    environment:
+      JAVA_OPT_EXT: '-Xms128m -Xmx192m -XX:MaxDirectMemorySize=64m'
+    command: ['sh', 'mqbroker', '-n', 'namesrv:9876', '-c', '/config/broker.conf']
+    depends_on: [namesrv]
+    ports: ['127.0.0.1:20911:20911', '127.0.0.1:20909:20909']
+    volumes:
+      - mq-data:/home/rocketmq/store
+      - ${GUIHONG_LAB_DIR}/broker.conf:/config/broker.conf:ro
+    networks: [mq]
+volumes:
+  mysql-data:
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+  object-data:
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+  mq-data:
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+networks:
+  database:
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+  storage:
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+  mq:
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
