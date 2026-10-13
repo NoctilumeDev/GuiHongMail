@@ -259,7 +259,7 @@ def collect(out):
         'M2-06': shared_detail['summary']['subject']=='共同邮件' and len(shared_detail['attachments'])==1 and database['raw']['sha256']==raw_digest,
         'M2-07': not browser['desktop']['unsafe_script_executed'] and not browser['browser']['external_requests'],
         'M2-08': bad_name_status==400 and good_status==201 and download_status==200 and download_headers.get('Content-Disposition','').startswith('attachment'),
-        'M2-09': state['summary']['folder']=='INBOX' and any(row['folder']=='INBOX' for row in counts),
+        'M2-09': state['summary']['folder']=='INBOX' and any(row['folder']=='INBOX' for row in counts) and browser['desktop']['unread_toggle_observed'] and browser['desktop']['restore_action_observed'],
         'M2-10': categorized['summary']['categoryId']==category['id'] and after_category['summary']['categoryId'] is None and after_category['summary']['folder']=='ARCHIVE',
         'M2-11': invalid_status==400 and len(page_one['items'])==1 and bool(page_one['nextCursor']) and search['items'][0]['subject']=='甲专有邮件',
         'M2-12': browser['desktop']['navigation']==browser['desktop']['expected_navigation'] and browser['desktop']['three_scroll_regions']==['auto','auto','auto'],

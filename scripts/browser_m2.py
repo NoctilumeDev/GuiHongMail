@@ -40,9 +40,22 @@ def main():
         page.locator('.message-detail').wait_for()
         frame = page.locator('iframe.safe-mail')
         safe_text = frame.content_frame.locator('body').inner_text() if frame.count() else page.locator('.plain-mail').inner_text()
+        actions = page.locator('.reader-actions')
+        actions.get_by_role('button', name='标为未读', exact=True).click()
+        actions.get_by_role('button', name='标为已读', exact=True).wait_for()
+        unread_toggle_observed = True
+        actions.get_by_role('button', name='标为已读', exact=True).click()
+        actions.get_by_role('button', name='标为未读', exact=True).wait_for()
+        actions.get_by_role('button', name='垃圾邮件', exact=True).click()
+        actions.get_by_role('button', name='恢复到收件箱', exact=True).wait_for()
+        actions.get_by_role('button', name='恢复到收件箱', exact=True).click()
+        actions.get_by_role('button', name='恢复到收件箱', exact=True).wait_for(state='detached')
+        restore_action_observed = True
         page.screenshot(path=str(output / 'desktop-reader.png'), full_page=True)
         facts['desktop'] = {'navigation': nav_labels, 'expected_navigation': base_labels,
                             'three_scroll_regions': pane_overflow,
+                            'unread_toggle_observed': unread_toggle_observed,
+                            'restore_action_observed': restore_action_observed,
                             'safe_projection_contains_script_text': '<script>' in safe_text,
                             'unsafe_script_executed': page.evaluate("Boolean(window.__guihongUnsafeExecuted)"),
                             'reader_subject': page.locator('.mail-header h1').inner_text(),
