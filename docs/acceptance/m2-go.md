@@ -23,4 +23,14 @@ Go 候选 `0fef1ca77358c130b8602bdd74e7d2a08eb15168` 于 `2026-10-14T05:25:26.83
 
 ## exact-main
 
-`PENDING`。只有本分支通过 PR/CI、受保护合入，并在 fresh owned lab 对合入后的精确 `origin/main` 重建、运行、负控、资源与清理全部通过，M2 才可升级为 `QUALIFIED`。
+[PR #8](https://github.com/NoctilumeDev/GuiHongMail/pull/8) 的静态合同、Go 后端与 Web 三项检查通过后，于 `2026-10-13T21:30:45Z` 受保护合入 merge SHA `4f92a5dfc646693237b476b4f38448d7bd798af6`。PR CI `38471083162` 和该 SHA 的 main CI `38471172552` 均成功。
+
+fresh worktree 再次 fetch 后实际确认 `HEAD == origin/main == 4f92a5dfc646693237b476b4f38448d7bd798af6` 且工作树干净。fresh lab `guihong-local-c57d603ecb2b` 第一次启动前因空闲内存瞬时低于 4 GiB 准入线停止，没有创建容器或卷；随后实测回升至阈值以上，同一未污染 lab 才获准启动，三个 schema 均为 virgin。exact-main 从锁文件重新安装收集器和前端依赖，重建三个二进制；构建回执 SHA-256 为 `52b8357136e57336f672d2c28740baae52064df4edb5866348595a9afddeae1a`。
+
+exact-main 运行 `guihong-m2-742b0ff7944944d6af9ad71c5ebb5969` 于 `2026-10-14T05:37:35.747953+08:00` 得到 `COMPLETED / PASS`，16 个硬用例全部通过。Plan 摘要 `4fa351d344337d3e6dd2ec8ce0bfd21ca2105241c71a39534a9181c1113857ec`，事实摘要 `b2996b9a6a1539c12b9e548657960b152570e99ae017097f25c8c88e9a17987e`，请求摘要 `f5f70444e97ee1e48ae14b691fb4cff658f86e25a97f3bac0f0c59001aa10705`，bundle manifest SHA-256 `90fbbaf023e71e17083e5ab0831dbef33145e73e82dedbe5d0fe4412d47ecda1`。
+
+资源守卫取得 13 个样本，其中 12 个为完整拓扑；停止原因为空。宿主峰值 `13,686,370,304 bytes`，单个 Go 应用 RSS 峰值 `19,570,688 bytes`，容器最小内存余量 `54.22%`，最小 PID 余量 66。真实 Edge 再次完成桌面、移动端、已读切换、垃圾邮件恢复及账户切换迟到响应隔离；外部请求为空且危险脚本未执行。错误绑定负控 `guihong-m2-3f27a3ec78ff45ab9e6eb2c8d39056ae` 为 `COMPLETED / INCONCLUSIVE`，缺证据负控 `guihong-m2-afe118f013da46049a2ae8790cf2a7ae` 为 `COMPLETED / PENDING`。应用已正常停止，owned 容器、网络和三个卷经标签核对后精确清理；private lab 与见证归档。
+
+## 资格结论
+
+Go M2 在 `4f92a5dfc646693237b476b4f38448d7bd798af6` 取得运行资格：本地候选、两轮 CI、受保护合入、fresh exact-main 重建、16 项业务与浏览器门、资源窗口、负控及 owned 清理闭合。M2 状态为 `QUALIFIED`，下一阶段为 Go M3；本记录不提前证明发送、Outbox、SMTP 投递或 M3 资格。
