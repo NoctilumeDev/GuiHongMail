@@ -308,6 +308,9 @@ def start(database_ports=None):
         env = environment()
         env.update(GUIHONG_WITNESS_ROOT=str(lab.LAB / 'witness' / role),
                    GUIHONG_INTERNAL_TOKEN=credentials['internal'][role],
+                   GUIHONG_INTERNAL_MAILBOX_TOKEN=credentials['internal']['mailbox'],
+                   GUIHONG_INTERNAL_INGRESS_TOKEN=credentials['internal']['ingress'],
+                   GUIHONG_INTERNAL_DELIVERY_TOKEN=credentials['internal']['delivery'],
                    GUIHONG_DB_DSN=f"{database['user']}:{database['password']}@tcp(127.0.0.1:{database_ports.get(role, 13306)})/{database['schema']}?parseTime=true&timeout=3s&readTimeout=10s&writeTimeout=10s&interpolateParams=true",
                    GUIHONG_S3_ENDPOINT='http://127.0.0.1:19833', GUIHONG_S3_BUCKET=storage['bucket'],
                    GUIHONG_S3_KEY=storage['access_key'], GUIHONG_S3_SECRET=storage['secret_key'],
