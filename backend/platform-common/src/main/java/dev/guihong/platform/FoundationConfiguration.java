@@ -5,6 +5,7 @@ import javax.sql.DataSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 @Configuration
@@ -16,8 +17,11 @@ public class FoundationConfiguration {
     @Bean(destroyMethod="close") public ObjectStore objects(FoundationSettings settings) {
         return new S3ObjectStore(settings.s3Endpoint(),settings.s3Bucket(),settings.s3Key(),settings.s3Secret());
     }
-    @Bean public FoundationController foundationController(WitnessGate witness,ObjectStore objects,FoundationSettings settings,ConfigurableApplicationContext context) {
-        return new FoundationController(witness,objects,settings,context);
+    @Bean public WriteGate writeGate(WitnessGate witness){return new WriteGate(witness);}
+    @Bean public BlobRepository blobs(WitnessGate witness,ObjectStore objects,JdbcTemplate jdbc,WriteGate gate){return new BlobRepository(witness,objects,jdbc,gate);}
+    @Bean public BlobController blobController(BlobRepository blobs){return new BlobController(blobs);}
+    @Bean public FoundationController foundationController(WitnessGate witness,ObjectStore objects,FoundationSettings settings,ConfigurableApplicationContext context,WriteGate gate,BlobRepository blobs) {
+        return new FoundationController(witness,objects,settings,context,gate,blobs);
     }
     @Bean public FilterRegistrationBean<InternalCommandFilter> internalFilter(FoundationSettings settings) {
         FilterRegistrationBean<InternalCommandFilter> registration=new FilterRegistrationBean<>(new InternalCommandFilter(settings));
