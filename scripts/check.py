@@ -115,12 +115,90 @@ def hygiene():
         raise RuntimeError('tracked private/generated files: '+', '.join(forbidden))
     return {'tracked_files': len(list(filter(None,files))), 'forbidden_tracked': forbidden}
 
+def backend():
+    errors = []
+    pom = (ROOT/'backend/pom.xml').read_text(encoding='utf-8')
+    modules = re.findall(r'<module>([^<]+)</module>', pom)
+    expected = ['platform-common','mailbox-service','smtp-ingress','delivery-worker']
+    if modules != expected:
+        errors.append('backend module boundary differs from '+repr(expected))
+    for value in ['<java.version>17</java.version>','<aws.version>2.55.15</aws.version>',
+                  '<rocketmq.version>5.5.0</rocketmq.version>']:
+        if value not in pom:errors.append('missing backend version lock '+value)
+    services = {'mailbox-service':'mailbox','smtp-ingress':'ingress','delivery-worker':'delivery'}
+    for module, migration in services.items():
+        module_pom=(ROOT/'backend'/module/'pom.xml').read_text(encoding='utf-8')
+        internal=[item for item in re.findall(r'<groupId>dev\.guihong</groupId><artifactId>([^<]+)</artifactId>',module_pom)
+                  if item!='guihong-backend']
+        if internal != ['platform-common']:errors.append(module+' has cross-service or missing internal dependency '+repr(internal))
+        if not (ROOT/'backend'/module/'src/main/resources/db/migration'/migration/'V1__foundation.sql').is_file():
+            errors.append(module+' missing independent foundation migration')
+    if errors:raise RuntimeError('\n'.join(errors))
+    return {'modules':modules,'independent_migrations':len(services),'java_release':17}
+
+def architecture():
+    errors=[]
+    tracked=subprocess.check_output(['git','ls-files','-z'],cwd=ROOT).decode().split('\0')
+    java=[rel for rel in tracked if rel.startswith('backend/') and '/src/main/java/' in rel and rel.endswith('.java')]
+    forbidden_domain=('org.springframework','jakarta.','java.sql','javax.sql','software.amazon','org.apache.rocketmq','org.subethamail')
+    service_roots={'mailbox-service':'dev.guihong.mailbox','smtp-ingress':'dev.guihong.ingress','delivery-worker':'dev.guihong.delivery'}
+    checked_domain=checked_application=0
+    for rel in java:
+        text=(ROOT/rel).read_text(encoding='utf-8')
+        imports=re.findall(r'^import\s+([^;]+);',text,re.MULTILINE)
+        parts=Path(rel).parts
+        if 'domain' in parts:
+            checked_domain+=1
+            bad=[name for name in imports if name.startswith(forbidden_domain)]
+            if bad:errors.append(rel+' domain imports implementation '+', '.join(bad))
+        if 'application' in parts:
+            checked_application+=1
+            bad=[name for name in imports if '.infrastructure.' in name or '.interfaces.' in name]
+            if bad:errors.append(rel+' application points outward '+', '.join(bad))
+        module=parts[1] if len(parts)>1 else ''
+        if module in service_roots:
+            foreign=[namespace for owner,namespace in service_roots.items() if owner!=module and namespace in text]
+            if foreign:errors.append(rel+' imports another service namespace '+', '.join(foreign))
+    if checked_domain<3 or checked_application<1:errors.append('declared domain/application layers were not found')
+    if errors:raise RuntimeError('\n'.join(errors))
+    return {'main_java_files':len(java),'domain_files':checked_domain,'application_files':checked_application,'violations':0}
+
+def security():
+    errors=[]
+    tracked=subprocess.check_output(['git','ls-files','-z'],cwd=ROOT).decode().split('\0')
+    signatures=[b'-----BEGIN '+b'PRIVATE KEY-----',b'AKIA'+b'[A-Z0-9]{16}',b'ghp_'+b'[A-Za-z0-9]{30,}',
+                b'github_pat_'+b'[A-Za-z0-9_]{40,}',b'xoxb-'+b'[A-Za-z0-9-]{20,}']
+    text_suffixes={'.md','.py','.java','.sql','.xml','.yml','.yaml','.json','.properties','.conf','.txt'}
+    for rel in filter(None,tracked):
+        path=ROOT/rel
+        if path.suffix.lower() not in text_suffixes or not path.is_file() or path.stat().st_size>2*1024*1024:continue
+        data=path.read_bytes()
+        for signature in signatures:
+            if re.search(signature,data):errors.append(rel+' contains a credential signature')
+    compose=(ROOT/'deploy/compose.yaml').read_text(encoding='utf-8')
+    published=re.findall(r"['\"]([^'\"]*:\d+:\d+)['\"]",compose)
+    non_loopback=[item for item in published if not item.startswith('127.0.0.1:')]
+    if not published or non_loopback:errors.append('compose host ports are absent or non-loopback '+repr(non_loopback))
+    for module in ('mailbox-service','smtp-ingress','delivery-worker'):
+        props=(ROOT/'backend'/module/'src/main/resources/application.properties').read_text(encoding='utf-8')
+        for required in ('server.address=127.0.0.1','server.error.include-message=never','server.error.include-stacktrace=never'):
+            if required not in props:errors.append(module+' missing '+required)
+    smtp=(ROOT/'backend/smtp-ingress/src/main/java/dev/guihong/ingress/infrastructure/FoundationSmtpListener.java').read_text(encoding='utf-8')
+    if 'bindAddress(InetAddress.getByName("127.0.0.1"))' not in smtp:errors.append('SMTP listener is not statically bound to loopback')
+    identity=(ROOT/'backend/mailbox-service/src/main/java/dev/guihong/mailbox/interfaces/IdentityController.java').read_text(encoding='utf-8')
+    for required in ('.httpOnly(true)','.sameSite("Strict")','.path("/api")'):
+        if required not in identity:errors.append('session cookie missing '+required)
+    store=(ROOT/'backend/platform-common/src/main/java/dev/guihong/platform/S3ObjectStore.java').read_text(encoding='utf-8')
+    if 'retryPolicy(RetryPolicy.none())' not in store:errors.append('S3 automatic retry policy is not explicitly disabled')
+    if errors:raise RuntimeError('\n'.join(errors))
+    return {'credential_signatures':0,'published_ports':published,'loopback_services':3,'session_cookie_flags':3,'s3_sdk_retries':0}
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('gate',choices=['docs','seal','hygiene','all'])
+    parser.add_argument('gate',choices=['docs','seal','backend','architecture','security','hygiene','all'])
     args = parser.parse_args()
-    gates = {'docs':docs,'seal':make_seal,'hygiene':hygiene}
-    selected = ['docs','hygiene'] if args.gate=='all' else [args.gate]
+    gates = {'docs':docs,'seal':make_seal,'backend':backend,'architecture':architecture,'security':security,'hygiene':hygiene}
+    selected = ['docs','backend','architecture','security','hygiene'] if args.gate=='all' else [args.gate]
     print(json.dumps({key:gates[key]() for key in selected}, ensure_ascii=False,indent=2))
 
 if __name__ == '__main__':
