@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -30,6 +31,7 @@ public final class WitnessGate implements AutoCloseable {
     private final Path root;
     private final String service;
     private final String generation;
+    private final String source;
     private final FileChannel lockChannel;
     private final FileLock processLock;
     private FileChannel journal;
@@ -39,8 +41,9 @@ public final class WitnessGate implements AutoCloseable {
     private volatile String state = "NOT_RECONCILED";
     private volatile String reason = "NOT_CHECKED";
 
-    public WitnessGate(DataSource database, Path root, String service) throws IOException {
-        this.database = database; this.root = root; this.service = service;
+    public WitnessGate(DataSource database, Path root, String service, String source) throws IOException {
+        this.database = database; this.root = root; this.service = service;this.source=source;
+        if (source==null || !source.matches("[0-9a-f]{40}")) throw new IOException("Exact build identity required");
         if (!Files.isDirectory(root) || Files.isSymbolicLink(root)) throw new IOException("Owned witness root missing/unsafe");
         generation = Files.readString(root.resolve("generation.txt"), StandardCharsets.UTF_8).trim();
         UUID.fromString(generation);
@@ -57,6 +60,7 @@ public final class WitnessGate implements AutoCloseable {
         try (Connection connection = database.getConnection()) {
             if (journal != null) { journal.close(); journal = null; }
             boolean markerExists;
+            boolean freshBootstrap=false;
             try (PreparedStatement query = connection.prepareStatement("SHOW TABLES LIKE 'foundation_meta'"); ResultSet rows = query.executeQuery()) {
                 markerExists = rows.next();
             }
@@ -66,6 +70,7 @@ public final class WitnessGate implements AutoCloseable {
                     throw new IllegalStateException("Missing database marker without unused virgin authority");
                 }
                 Files.move(root.resolve("bootstrap-permit"), root.resolve("bootstrap-consumed"));
+                freshBootstrap=true;
                 Flyway.configure().dataSource(database).locations("classpath:db/migration/" + service).cleanDisabled(true).load().migrate();
                 try (PreparedStatement insert = connection.prepareStatement("INSERT INTO foundation_meta(singleton,generation,last_committed_seq) VALUES(1,?,0)")) {
                     insert.setString(1, generation); insert.executeUpdate();
@@ -130,14 +135,46 @@ public final class WitnessGate implements AutoCloseable {
             if (!databaseReceipts.isEmpty() || maximumCommitted != lastSequence) throw new IllegalStateException("Unwitnessed database state or old snapshot");
             nextSequence = maximumPrepared + 1;
             lastCommittedSequence = maximumCommitted;
-            // Validation never repairs migration history or adopts a restored generation.
-            Flyway.configure().dataSource(database).locations("classpath:db/migration/" + service).cleanDisabled(true).load().validate();
+            reconcileSchema(connection,freshBootstrap);
             state = "READY"; reason = "RECONCILED";
         } catch (SQLException error) {
             state = "WAITING_DEPENDENCY"; reason = "DATABASE_UNAVAILABLE";
         } catch (Exception error) {
             state = "NOT_RECONCILED"; reason = error.getClass().getSimpleName();
         }
+    }
+
+    private String schemaHash(Connection connection) throws SQLException {
+        StringBuilder rows=new StringBuilder();
+        try (PreparedStatement query=connection.prepareStatement("SELECT CONCAT_WS('|',installed_rank,COALESCE(version,''),description,type,script,COALESCE(checksum,''),IF(success,1,0)) FROM flyway_schema_history ORDER BY installed_rank");ResultSet result=query.executeQuery()) {
+            while(result.next())rows.append(result.getString(1)).append('\n');
+        }
+        return Hashes.sha256(rows.toString());
+    }
+    private void durableNew(Path path,String value) throws IOException {
+        try(FileChannel output=FileChannel.open(path,StandardOpenOption.CREATE_NEW,StandardOpenOption.WRITE)) {
+            ByteBuffer bytes=StandardCharsets.UTF_8.encode(value);
+            while(bytes.hasRemaining())output.write(bytes);output.force(true);
+        }
+    }
+    private void reconcileSchema(Connection connection,boolean freshBootstrap) throws Exception {
+        Path expected=root.resolve("schema-history.sha256");Path pending=root.resolve("schema-migration.pending");
+        if(Files.exists(pending))throw new IllegalStateException("Incomplete schema migration; independent reconciliation required");
+        String actual=schemaHash(connection);
+        if(freshBootstrap)durableNew(expected,actual+"\n");
+        if(!Files.isRegularFile(expected) || Files.isSymbolicLink(expected) || !Hashes.same(Files.readString(expected).trim(),actual))
+            throw new IllegalStateException("Schema witness mismatch");
+        Flyway flyway=Flyway.configure().dataSource(database).locations("classpath:db/migration/"+service).cleanDisabled(true).load();
+        // Compare independent history BEFORE any migration can change a restored database.
+        if(flyway.info().pending().length>0) {
+            durableNew(pending,generation+"|"+source+"|"+actual+"\n");
+            flyway.migrate();
+            String after=schemaHash(connection);Path replacement=root.resolve("schema-history-"+UUID.randomUUID()+".next");
+            durableNew(replacement,after+"\n");
+            Files.move(replacement,expected,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
+            Files.move(pending,root.resolve("schema-migration-"+UUID.randomUUID()+".completed"));
+        }
+        flyway.validate();
     }
 
     public synchronized <T> T write(String descriptor, SqlWork<T> operation) {

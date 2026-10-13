@@ -1,0 +1,11 @@
+# M1 有界实现补充
+
+此文件说明已批准 A02–A05 的实现参数；不修改 M0 或用新检查替换既有分母。每个正式采集 Plan 在观察前绑定本文件的实际摘要。
+
+会话为 32 字节随机 token，数据库只存摘要；30 分钟到期，HttpOnly、SameSite Strict、Path /api。当前回环 HTTP profile 的唯一浏览器 Origin 为 `http://127.0.0.1:18080`；写请求同时检查 Origin 与会话独立 CSRF nonce。刷新竞争在同一事务中删除旧 token 并创建新 token；停用与 auth epoch 改变阻止旧会话。密码采用 BCrypt cost 10，输入最多 72 个 UTF-8 字节；不存在账户也执行同 cost 比较，错误反馈一致。登录每回环客户端每分钟最多 5 次，预算持久化；两合成账户不构成公网账户能力。
+
+库外事务 witness 最多 10 MiB / 10000 个事务，PREPARE 在 COMMIT 前 fsync；没有确定 COMMIT 结果就保存 U 并禁止写/GC。DB receipt 与 generation/sequence 在业务事务内提交。库外 schema history 摘要先与当前 DB 核对，再允许候选源码的待执行 Flyway 迁移；迁移先写独立 pending 记录，结果未知时不得自动重做/修复。首次开发底座 `9b7be12651ac5584de9ae1fc69aadbbff16f6918` 尚无业务事务：升级至 schema witness 时只在三个 generation 正确、receipt 为空、sequence 0、事务日志为空的已观察首次初始化状态建立一次基线，保存观察原件。正式 M1 起缺失 schema witness 一律阻止恢复；没有 reset/adopt 功能。
+
+Broker 单 CPU、512 MiB、128 PID 的预算保持；JVM 显式感知 1 CPU，使用明确 HEAP_OPTS。普通消息使用 SYNC_FLUSH；关闭未使用的 TimerWheel / POP 服务，经典 delay level 收束到 1s/5s/10s。Delivery 的重试仍由本地数据库状态机裁决，不实现用户定时发送。默认 19 个异步日志线程由单一同步 INFO 控制台替代，Docker 本容器日志最多 3×10 MiB，实际首败另存。服务创建真实 MQ 客户端后仍须重新验证资源余量，启动文字不构成消息资格。
+
+资源 watchdog 每 5 秒保存全机与各具名应用 RSS；全机连续三次大于 14 GiB、任一应用 RSS 大于 384 MiB 时停止精确 owned 实验，保留数据库、对象卷和库外 witness。各执行窗口最长 3600 秒，可在下一明确窗口继续，不构成计划任务。

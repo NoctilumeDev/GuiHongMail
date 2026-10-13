@@ -11,7 +11,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 public class FoundationConfiguration {
     @Bean public FoundationSettings settings() throws IOException { return FoundationSettings.fromEnvironment(); }
     @Bean(destroyMethod="close") public WitnessGate witness(DataSource dataSource,FoundationSettings settings) throws IOException {
-        return new WitnessGate(dataSource,settings.witnessRoot(),settings.role());
+        return new WitnessGate(dataSource,settings.witnessRoot(),settings.role(),settings.sourceSha());
     }
     @Bean(destroyMethod="close") public ObjectStore objects(FoundationSettings settings) {
         return new S3ObjectStore(settings.s3Endpoint(),settings.s3Bucket(),settings.s3Key(),settings.s3Secret());
