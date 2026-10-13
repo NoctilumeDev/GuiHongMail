@@ -2,7 +2,7 @@
 
 > 云水之间，归鸿有信。
 
-**状态：`M0_FROZEN / M1_LOCAL_CANDIDATE_PASS / EXACT_MAIN_PENDING` · 2026-10-13。** M0 的 17 项合同/参考字节已在受保护主线闭合；M1 候选 `4406d6d` 已取得本地三子门与资源聚合 PASS，仍须 PR、CI、受保护合入及 exact-main 新实验，不能提前称为主线运行资格。用户已授权连续施工 M1–M6。当前阶段以[状态账册](docs/status.md)为准，见[M1 候选证据](docs/acceptance/m1.md)、[授权](docs/authorization.md)与[M0 资格](docs/acceptance/m0.md)。
+**状态：`M0_FROZEN / M1_QUALIFIED / M2_NEXT` · 2026-10-13。** M1 已在 main `51fe465` 经 PR/CI、fresh exact-main 三子门、资源窗口与公开 Core 聚合取得资格；原始失败仍保留。该结论只覆盖底座 A02–A05，不宣称 M2 邮箱或真实收发链路已完成。用户已授权连续施工 M1–M6。当前阶段以[状态账册](docs/status.md)为准，见[M1 资格证据](docs/acceptance/m1.md)、[授权](docs/authorization.md)与[M0 资格](docs/acceptance/m0.md)。
 
 ## 产品定位
 
