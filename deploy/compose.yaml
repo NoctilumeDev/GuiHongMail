@@ -41,6 +41,21 @@ services:
     command: ['sh', 'mqnamesrv']
     ports: ['127.0.0.1:19876:9876']
     networks: [mq]
+  store-init:
+    image: apache/rocketmq@sha256:a613f1341f3404b96900cf11e5c35f2d049c103504a1dd60242a04cebf5be467
+    platform: linux/amd64
+    labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
+    user: '0:0'
+    mem_limit: 64m
+    cpus: 0.2
+    pids_limit: 16
+    read_only: true
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    entrypoint: ['chown']
+    command: ['3000:3000', '/guihong-store']
+    volumes: ['mq-data:/guihong-store']
   broker:
     image: apache/rocketmq@sha256:a613f1341f3404b96900cf11e5c35f2d049c103504a1dd60242a04cebf5be467
     platform: linux/amd64
@@ -51,7 +66,9 @@ services:
     environment:
       JAVA_OPT_EXT: '-Xms128m -Xmx192m -XX:MaxDirectMemorySize=64m'
     command: ['sh', 'mqbroker', '-n', 'namesrv:9876', '-c', '/config/broker.conf']
-    depends_on: [namesrv]
+    depends_on:
+      namesrv: {condition: service_started}
+      store-init: {condition: service_completed_successfully}
     ports: ['127.0.0.1:20911:20911', '127.0.0.1:20909:20909']
     volumes:
       - mq-data:/home/rocketmq/store
