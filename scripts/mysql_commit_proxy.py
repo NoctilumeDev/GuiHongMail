@@ -44,6 +44,10 @@ class Proxy:
                     payload=packet[4:]
                     armed=(self.root/'arm').is_file()
                     commit=len(payload)>1 and payload[0]==3 and payload[1:].decode('utf-8','replace').strip().lower()=='commit'
+                    if armed:
+                        self.record('armed-command',{'bytes':len(packet),'sha256':hashlib.sha256(packet).hexdigest(),
+                            'command':payload[0] if payload else None,'payload_prefix_hex':payload[:16].hex(),
+                            'simple_commit_match':commit})
                     upstream.sendall(packet)
                     if armed and commit:
                         fired=True

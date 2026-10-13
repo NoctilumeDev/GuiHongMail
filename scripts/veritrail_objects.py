@@ -147,6 +147,8 @@ def main():
         journal=(lab.LAB/'witness/mailbox/transactions.log').read_text(encoding='utf-8').splitlines();outcome=journal[-1].split('|')[2]
         readiness_after=call('mailbox','/health/ready')[0]
         facts['commit_unknown']={'http':unknown_call[0]['http'],'journal_outcome':outcome,**unknown_db,'s3_http':unknown_s3['http'],'s3_sha256':unknown_s3.get('sha256'),'readiness_after':readiness_after}
+        require_http('commit-unknown reference',unknown_call,503)
+        if outcome!='U':raise RuntimeError('Commit-unknown witness outcome was '+outcome+', expected U')
         apps.stop();mailbox_running=False
         lab.write_new(proxy_root/'stop','normal exact proxy stop\n');proxy.wait(10)
         apps.start();mailbox_running=True
