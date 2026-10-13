@@ -270,8 +270,11 @@ def main():
     if git('status','--porcelain'):
         raise RuntimeError('M2 evidence requires committed clean source')
     source=git('rev-parse','HEAD'); run='guihong-m2-'+uuid.uuid4().hex; out=lab.local_run(run,create=True)
-    spec={'id':'m2-runtime','schema_version':'0.1','evidence_type':'GuiHongM2Observation','description':'Finite M2 API, SQL, S3, browser, restart and resource observation','method':'owned local runtime and independent browser','source':'guihong-m2/1.0'}
-    assertions=[{'id':case.lower(),'criticality':'HARD','actual':{'requirement_id':'m2','path':'/cases/'+case},'operator':'eq','expected':True} for case in [f'M2-{n:02d}' for n in range(1,17)]]
+    request={'source_sha':source,'contract_sha256':hashlib.sha256((ROOT/'docs/m2-plan.md').read_bytes()).hexdigest(),'control':args.control}
+    spec={'id':'m2-runtime','contract':{'id':'guihong-m2-local','version':'1.0'},'evidence_type':'guihong.m2',
+          'coordinates':request,'projections':['source_sha','cases','http','database','storage','browser','restart','resource','boundary'],
+          'canonicalization_profile':'veritrail-json-c14n/1'}
+    assertions=[{'id':case.lower(),'severity':'HARD','left':{'requirement_id':'m2','path':'/facts/cases/'+case},'operator':'eq','right':True} for case in [f'M2-{n:02d}' for n in range(1,17)]]
     plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m2-local','version':1,
         'subject':{'id':'guihong-m2-candidate','version':source,'source_ref':'github:NoctilumeDev/GuiHongMail'},
         'question':'Does the exact Go source satisfy the finite M2 mailbox and web contract?',
