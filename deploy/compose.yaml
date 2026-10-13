@@ -33,7 +33,7 @@ services:
     image: apache/rocketmq@sha256:a613f1341f3404b96900cf11e5c35f2d049c103504a1dd60242a04cebf5be467
     platform: linux/amd64
     labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
-    mem_limit: 192m
+    mem_limit: 256m
     cpus: 1.0
     pids_limit: 128
     environment:
@@ -62,7 +62,7 @@ services:
     labels: {guihong.owner: '${GUIHONG_LAB_ID}'}
     mem_limit: 512m
     cpus: 1.0
-    pids_limit: 128
+    pids_limit: 192
     environment:
       HEAP_OPTS: '-Xms96m -Xmx128m -XX:MaxDirectMemorySize=128m -XX:-TieredCompilation -XX:CICompilerCount=1'
       JAVA_OPT_EXT: '-XX:ActiveProcessorCount=1 -XX:-UseG1GC -XX:+UseSerialGC'

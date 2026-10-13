@@ -196,9 +196,10 @@ def main():
         'resource_evidence': resource_ids,
         'contracts': {name: sha_file(ROOT / path) for name, path in {
             'm1_plan': 'docs/m1-plan.md', 'm1_components': 'docs/m1-components.md',
+            'm1_resource_contract': 'docs/m1-resource-contract-1.1.md',
             'environment_lock': 'docs/environment-lock.json', 'ci': '.github/workflows/ci.yml'}.items()},
     }
-    spec = {'id': 'm1-local-observation', 'contract': {'id': 'guihong-m1-local', 'version': '1.1'},
+    spec = {'id': 'm1-local-observation', 'contract': {'id': 'guihong-m1-local', 'version': '1.2'},
             'evidence_type': 'guihong.m1', 'coordinates': request,
             'projections': ['source_sha', 'contracts', 'core', 'children', 'resources', 'build', 'gates', 'cleanup', 'boundary'],
             'canonicalization_profile': 'veritrail-json-c14n/1'}
@@ -242,7 +243,7 @@ def main():
     assertions.append(hard('infrastructure-resource-witness', 'resources/infrastructure_roles_seen', list(resource_guard.INFRASTRUCTURE)))
     assertions.append(hard('sustained-full-topology', 'resources/full_topology_sustained', True))
     plan = seal_acceptance_plan({
-        'plan_kind': 'ACCEPTANCE', 'schema_version': '0.1', 'plan_id': 'guihong-m1-local', 'version': 2,
+        'plan_kind': 'ACCEPTANCE', 'schema_version': '0.1', 'plan_id': 'guihong-m1-local', 'version': 3,
         'subject': {'id': 'guihong-m1-' + args.mode, 'version': source, 'source_ref': 'github:NoctilumeDev/GuiHongMail'},
         'question': 'Do all finite M1 local child, build, architecture, resource and public-Core gates reconcile for the exact source?',
         'governance': {'claim_owner_ref': 'human:repository-owner', 'drafter_ref': 'guihong:m1-reconciler',
@@ -268,6 +269,7 @@ def main():
     try:
         facts['contracts'] = {name: sha_file(ROOT / path) for name, path in {
             'm1_plan': 'docs/m1-plan.md', 'm1_components': 'docs/m1-components.md',
+            'm1_resource_contract': 'docs/m1-resource-contract-1.1.md',
             'environment_lock': 'docs/environment-lock.json', 'ci': '.github/workflows/ci.yml'}.items()}
         dist = distribution('veritrail')
         record = Path(dist.locate_file('veritrail-0.13.0.dist-info/RECORD'))
@@ -304,10 +306,10 @@ def main():
                 'plan_digest': plan['seal']['digest'], 'observation_spec_digest': observation_spec_digest(spec),
                 'request_seal_digest': sha256_json(request), 'collection_session_id': run,
                 'collector_role': 'guihong-m1-reconciler', 'coverage': 'COMPLETE' if status == 'COMPLETED' else 'ERROR',
-                'normalization_semantics_version': 'guihong-m1/1.1', 'facts_digest': sha256_json(facts)}
+                'normalization_semantics_version': 'guihong-m1/1.2', 'facts_digest': sha256_json(facts)}
     if args.control == 'wrong-binding':
         metadata['plan_digest'] = '0' * 64
-    evidence = {'schema_version': '0.1', 'evidence_type': spec['evidence_type'], 'source': 'guihong-m1/1.1',
+    evidence = {'schema_version': '0.1', 'evidence_type': spec['evidence_type'], 'source': 'guihong-m1/1.2',
                 'captured_at': datetime.now(timezone.utc).isoformat(), 'facts': facts,
                 'metadata': {'veritrail_observation': metadata}}
     save(out / 'evidence.json', evidence)

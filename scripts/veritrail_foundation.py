@@ -25,13 +25,18 @@ def main():
     if git('status','--porcelain') or version('veritrail')!='0.13.0':raise RuntimeError('Clean exact source and public locked Core required')
     source=git('rev-parse','HEAD');run='guihong-foundation-'+uuid.uuid4().hex;out=lab.local_run(run,create=True)
     expected={'source_sha':source,'lab_id':lab.load()['id'],'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),
-        'contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),'mq_topic':lab.load()['id'].replace('-','_')+'_probe_'+uuid.uuid4().hex[:12],
+        'contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),
+        'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.1.md').read_bytes()),
+        'mq_topic':lab.load()['id'].replace('-','_')+'_probe_'+uuid.uuid4().hex[:12],
         'jars':{r:sha((ROOT/'backend'/apps.MODULES[r]/'target'/(apps.MODULES[r]+'-0.1.0-SNAPSHOT.jar')).read_bytes()) for r in lab.SERVICES}}
-    spec={'id':'foundation-observation','contract':{'id':'guihong-foundation','version':'1.0'},'evidence_type':'guihong.foundation',
+    spec={'id':'foundation-observation','contract':{'id':'guihong-foundation','version':'1.1'},'evidence_type':'guihong.foundation',
         'coordinates':expected,'projections':['source_sha','startup','database','sessions','smtp','mq','drain','shutdown'],
         'canonicalization_profile':'veritrail-json-c14n/1'}
     def hard(id,path,value):return {'id':id,'severity':'HARD','left':{'requirement_id':'foundation','path':'/facts/'+path},'operator':'eq','right':value}
-    assertions=[hard('exact-source','source_sha',source),hard('clean','source_clean',True),hard('component','component_sha256',expected['component_sha256'])]
+    assertions=[hard('exact-source','source_sha',source),hard('clean','source_clean',True),
+        hard('base-contract','contract_sha256',expected['contract_sha256']),
+        hard('component','component_sha256',expected['component_sha256']),
+        hard('resource-contract','resource_contract_sha256',expected['resource_contract_sha256'])]
     for r in lab.SERVICES:
         assertions+=[hard(r+'-role','startup/'+r+'/service',r),hard(r+'-source','startup/'+r+'/source_sha',source),hard(r+'-state','startup/'+r+'/state','READY'),
             hard(r+'-ready','readiness/'+r+'/http',200),hard(r+'-jar','startup_jars/'+r,expected['jars'][r]),hard(r+'-own-db','database/'+r+'/own_crud','ROLLED_BACK'),
@@ -46,8 +51,8 @@ def main():
         hard('http-only','session_attributes/httponly',True),hard('same-site','session_attributes/samesite','Strict'),hard('cookie-path','session_attributes/path','/api'),
         hard('external-relay','smtp/external_rcpt',550),hard('no-false-accept','smtp/local_rcpt',451),hard('no-data-responsibility','smtp/data',503),
         hard('mq-send','mq/send_status','SEND_OK'),hard('mq-pull','mq/pull_status','FOUND'),hard('mq-body','mq/received_sha256',sha(('归鸿真实 MQ 见证|'+expected['mq_topic']).encode())),
-        hard('mq-cleanup','mq/cleanup','EXACT_CREATED_TOPIC_AND_GROUP'),hard('broker-budget','broker/memory_limit',512*1024**2),hard('broker-no-oom','broker/oom_killed',False),hard('broker-pid-budget','broker/pid_limit',128)]
-    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-foundation','version':2,
+        hard('mq-cleanup','mq/cleanup','EXACT_CREATED_TOPIC_AND_GROUP'),hard('broker-budget','broker/memory_limit',512*1024**2),hard('broker-no-oom','broker/oom_killed',False),hard('broker-pid-budget','broker/pid_limit',192)]
+    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-foundation','version':3,
         'subject':{'id':'guihong-m1-foundation-identity-smtp','version':source,'source_ref':'github:NoctilumeDev/GuiHongMail'},
         'question':'Do independent services, actual database identities, bounded sessions, rejecting SMTP and actual ordinary MQ satisfy M1 foundation obligations?',
         'governance':{'claim_owner_ref':'human:repository-owner','drafter_ref':'guihong:foundation-collector','seal_authority_ref':'human:repository-owner:guihong-m1-m6-20261013','seal_decision':'CONFIRMED'},
@@ -81,7 +86,9 @@ def main():
         result={'http':status,'body':public}
         event({'method':method,'service':role,'path':path,'result':result,'response_bytes':len(raw),'response_sha256':sha(raw)})
         return result,value,set_cookie
-    facts={'source_sha':source,'source_clean':True,'component_sha256':expected['component_sha256'],'boundary':'M1_FOUNDATION_IDENTITY_SMTP_ONLY'}
+    facts={'source_sha':source,'source_clean':True,'contract_sha256':expected['contract_sha256'],
+        'component_sha256':expected['component_sha256'],
+        'resource_contract_sha256':expected['resource_contract_sha256'],'boundary':'M1_FOUNDATION_IDENTITY_SMTP_ONLY'}
     status='COMPLETED';bob_id=None
     try:
         apps.start();facts['startup']={r:apps.request(r,'/internal/identity') for r in lab.SERVICES}
@@ -185,8 +192,8 @@ def main():
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],
         'observation_spec_digest':observation_spec_digest(spec),'request_seal_digest':sha256_json(expected),'collection_session_id':run,
         'collector_role':'guihong-foundation-collector','coverage':'COMPLETE' if status=='COMPLETED' else 'ERROR',
-        'normalization_semantics_version':'guihong-foundation/1.1','facts_digest':sha256_json(facts)}
-    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-foundation/1.1',
+        'normalization_semantics_version':'guihong-foundation/1.2','facts_digest':sha256_json(facts)}
+    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-foundation/1.2',
         'captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
     save(out/'evidence.json',evidence)
     report=create_acceptance_bundle(plan=plan,evidence_paths=[out/'evidence.json'],output=out/'bundle',acceptance_id=run,execution_status=status)

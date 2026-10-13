@@ -6,7 +6,7 @@
 | --- | --- |
 | M0 | `FROZEN`，17项冻结字节，摘要 `1feb3418b68f0f176645350196313076a8e113ee7b7f54273f9efac8218fc460` |
 | M0资格主线 | `b34783bd7b440cc466512986f0c74869a4c748e5`；仅文档/授权边界 |
-| M1 | `AUTHORIZED / IN_PROGRESS / NO_RUNTIME_QUALIFICATION`，实际开始 `2026-10-13T04:06:43.7320975Z`；[具体合同](m1-plan.md)、[运行账册](run-ledger.md) |
+| M1 | `AUTHORIZED / IN_PROGRESS / NO_RUNTIME_QUALIFICATION`，实际开始 `2026-10-13T04:06:43.7320975Z`；原资源失败保持非 PASS，后续候选绑定[资源合同修订 1.1](m1-resource-contract-1.1.md)；[基础合同](m1-plan.md)、[运行账册](run-ledger.md) |
 | M2–M6 | `AUTHORIZED / NOT_STARTED`，依前一阶段门禁连续串行推进 |
 | M7 | `DEFERRED_HUMAN_PARTICIPATION`，需用户另行开启 |
 | E1 | `NOT_AUTHORIZED` |
