@@ -52,6 +52,9 @@ func NewRuntime(role string) (*Runtime, error) {
 	}
 	runtime := &Runtime{Config: config, Database: database, Witness: witness, Store: store, migrations: migrations}
 	runtime.Objects = NewObjectRepository(database, witness, store, runtime.Draining)
+	reconcileContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	runtime.Objects.Reconcile(reconcileContext)
 	return runtime, nil
 }
 
