@@ -218,8 +218,10 @@ public final class WitnessGate implements AutoCloseable {
                     try { append(sequence, id, "U", digest); } catch (IOException witnessError) { error.addSuppressed(witnessError); }
                     throw new CommitUnknownException(id, error);
                 }
+                boolean rollbackConfirmed=true;
                 try { connection.rollback(); append(sequence, id, "A", digest); }
-                catch (Exception rollbackError) { state = "NOT_RECONCILED"; reason = "ROLLBACK_UNKNOWN"; error.addSuppressed(rollbackError); }
+                catch (Exception rollbackError) { rollbackConfirmed=false;state = "NOT_RECONCILED"; reason = "ROLLBACK_UNKNOWN"; error.addSuppressed(rollbackError); }
+                if(rollbackConfirmed && error instanceof RuntimeException runtime)throw runtime;
                 throw new IllegalStateException("Transaction rejected", error);
             }
         } catch (SQLException beginError) {

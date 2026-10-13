@@ -14,7 +14,7 @@ from veritrail.acceptance_plan import observation_spec_digest, seal_acceptance_p
 from veritrail.acceptance_reporting import create_acceptance_bundle
 from veritrail.canonical import sha256_json
 
-import apps
+import go_apps as apps
 import lab
 import resource_guard
 
@@ -146,10 +146,11 @@ def inspect_build(source):
         'receipt': receipt_path.relative_to(ROOT).as_posix(),
         'receipt_sha256': sha_file(receipt_path),
         'source_sha': receipt['source_sha'],
+        'go_version': receipt['go_version'],
         'exit_code': receipt['exit_code'],
         'log_verified': True,
         'artifact_count': len(receipt['artifacts']),
-        'artifacts_verified': len(verified) == 4,
+        'artifacts_verified': len(verified) == 3,
     }
 
 
@@ -197,6 +198,7 @@ def main():
         'contracts': {name: sha_file(ROOT / path) for name, path in {
             'm1_plan': 'docs/m1-plan.md', 'm1_components': 'docs/m1-components.md',
             'm1_resource_contract': 'docs/m1-resource-contract-1.1.md',
+            'go_runtime_contract': 'docs/m0.1-go-runtime.md', 'go_environment_lock': 'docs/go-environment-lock.json',
             'environment_lock': 'docs/environment-lock.json', 'ci': '.github/workflows/ci.yml'}.items()},
     }
     spec = {'id': 'm1-local-observation', 'contract': {'id': 'guihong-m1-local', 'version': '1.2'},
@@ -212,8 +214,9 @@ def main():
         hard('source', 'source_sha', source), hard('clean', 'source_clean', True), hard('mode', 'mode', args.mode),
         hard('core-version', 'core/version', '0.13.0'), hard('core-lock', 'core/locked_wheel_sha256', '95cb00c08fa4a29c21c798c7ca5a8200bb83f71cd11b31b1dea01c19ec5a8a04'),
         hard('build-source', 'build/source_sha', source), hard('build-exit', 'build/exit_code', 0),
+        hard('build-go-version', 'build/go_version', 'go version go1.27.2 windows/amd64'),
         hard('build-log', 'build/log_verified', True), hard('build-artifacts', 'build/artifacts_verified', True),
-        hard('build-count', 'build/artifact_count', 4), hard('static-gate', 'gates/static/exit_code', 0),
+        hard('build-count', 'build/artifact_count', 3), hard('static-gate', 'gates/static/exit_code', 0),
         hard('proxy-parser-tests', 'gates/proxy_parser/exit_code', 0),
         hard('apps-stopped', 'cleanup/applications_stopped', {'delivery': True, 'ingress': True, 'mailbox': True}),
     ]
@@ -270,6 +273,7 @@ def main():
         facts['contracts'] = {name: sha_file(ROOT / path) for name, path in {
             'm1_plan': 'docs/m1-plan.md', 'm1_components': 'docs/m1-components.md',
             'm1_resource_contract': 'docs/m1-resource-contract-1.1.md',
+            'go_runtime_contract': 'docs/m0.1-go-runtime.md', 'go_environment_lock': 'docs/go-environment-lock.json',
             'environment_lock': 'docs/environment-lock.json', 'ci': '.github/workflows/ci.yml'}.items()}
         dist = distribution('veritrail')
         record = Path(dist.locate_file('veritrail-0.13.0.dist-info/RECORD'))

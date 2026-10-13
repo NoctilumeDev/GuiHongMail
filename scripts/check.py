@@ -117,13 +117,28 @@ def hygiene():
 
 def backend():
     errors = []
+    # The Java tree is retained as an exact historical baseline. Current runtime
+    # qualification is bound to the three Go commands and the locked module graph.
+    gomod = (ROOT/'go.mod').read_text(encoding='utf-8')
+    for value in ('go 1.27.2','github.com/apache/rocketmq-client-go/v2 v2.1.2',
+                  'github.com/go-sql-driver/mysql v1.10.1','golang.org/x/crypto v0.58.0'):
+        if value not in gomod:errors.append('missing Go dependency lock '+value)
+    go_commands=[]
+    for role in ('mailbox','ingress','delivery'):
+        path=ROOT/'cmd'/role/'main.go'
+        if not path.is_file():errors.append('missing Go service command '+role)
+        else:go_commands.append(role)
+    migrations=(ROOT/'internal/platform/migrations.go').read_text(encoding='utf-8')
+    for table in ('foundation_meta','tx_receipts','stored_objects','object_refs','accounts','sessions','login_buckets'):
+        if 'CREATE TABLE '+table not in migrations:errors.append('missing Go migration table '+table)
     pom = (ROOT/'backend/pom.xml').read_text(encoding='utf-8')
     modules = re.findall(r'<module>([^<]+)</module>', pom)
     expected = ['platform-common','mailbox-service','smtp-ingress','delivery-worker']
     if modules != expected:
         errors.append('backend module boundary differs from '+repr(expected))
     for value in ['<java.version>17</java.version>','<aws.version>2.55.15</aws.version>',
-                  '<rocketmq.version>5.5.0</rocketmq.version>']:
+                  '<rocketmq.version>5.5.0</rocketmq.version>','<angus.version>2.0.5</angus.version>',
+                  '<html-sanitizer.version>20260313.1</html-sanitizer.version>']:
         if value not in pom:errors.append('missing backend version lock '+value)
     services = {'mailbox-service':'mailbox','smtp-ingress':'ingress','delivery-worker':'delivery'}
     for module, migration in services.items():
@@ -134,7 +149,29 @@ def backend():
         if not (ROOT/'backend'/module/'src/main/resources/db/migration'/migration/'V1__foundation.sql').is_file():
             errors.append(module+' missing independent foundation migration')
     if errors:raise RuntimeError('\n'.join(errors))
-    return {'modules':modules,'independent_migrations':len(services),'java_release':17}
+    return {'runtime':'go1.27.2','go_commands':go_commands,'go_migration_tables':7,
+            'retained_java_modules':modules,'java_baseline_release':17}
+
+def frontend():
+    package=json.loads((ROOT/'frontend/web/package.json').read_text(encoding='utf-8'))
+    lock=json.loads((ROOT/'frontend/web/package-lock.json').read_text(encoding='utf-8'))
+    errors=[]
+    if package.get('dependencies')!={'vue':'3.5.44'}:errors.append('frontend runtime dependency set changed')
+    if lock.get('lockfileVersion')!=3 or lock.get('packages',{}).get('',{}).get('dependencies')!=package.get('dependencies'):
+        errors.append('frontend lock does not bind runtime dependencies')
+    navigation=(ROOT/'frontend/web/src/navigation.ts').read_text(encoding='utf-8')
+    labels=re.findall(r"label: '([^']+)'",navigation)
+    if labels!=['写信','收件箱','已发邮件','草稿箱','归档','垃圾邮件','已删除']:
+        errors.append('frontend navigation differs from frozen seven entries')
+    css=(ROOT/'frontend/web/src/styles.css').read_text(encoding='utf-8')
+    for required in ('.pane {','overflow-y: auto','@media (max-width: 700px)','.left-collapsed','.list-collapsed',
+                     '.mobile-step-folders','.mobile-step-list','.mobile-step-reader'):
+        if required not in css:errors.append('frontend layout contract missing '+required)
+    app=(ROOT/'frontend/web/src/App.vue').read_text(encoding='utf-8')
+    for required in ('sandbox=""','发送（M3 开放）'):
+        if required not in app:errors.append('frontend safety/route contract missing '+required)
+    if errors:raise RuntimeError('\n'.join(errors))
+    return {'runtime_dependencies':package['dependencies'],'lockfile_version':3,'navigation_entries':labels,'independent_scroll_regions':3}
 
 def architecture():
     errors=[]
@@ -159,16 +196,34 @@ def architecture():
         if module in service_roots:
             foreign=[namespace for owner,namespace in service_roots.items() if owner!=module and namespace in text]
             if foreign:errors.append(rel+' imports another service namespace '+', '.join(foreign))
-    if checked_domain<3 or checked_application<1:errors.append('declared domain/application layers were not found')
+    go=[rel for rel in tracked if (rel.startswith('internal/') or rel.startswith('cmd/')) and rel.endswith('.go') and not rel.endswith('_test.go')]
+    go_domain=go_application=0
+    for rel in go:
+        text=(ROOT/rel).read_text(encoding='utf-8')
+        imports=re.findall(r'"(github\.com/NoctilumeDev/GuiHongMail/internal/[^"]+)"',text)
+        parts=Path(rel).parts
+        if 'domain' in parts:
+            go_domain+=1
+            bad=[name for name in imports if '/infrastructure' in name or '/interfaces' in name or '/platform' in name]
+            if bad:errors.append(rel+' Go domain imports implementation '+', '.join(bad))
+        if 'application' in parts:
+            go_application+=1
+            bad=[name for name in imports if '/infrastructure' in name or '/interfaces' in name]
+            if bad:errors.append(rel+' Go application points outward '+', '.join(bad))
+        if rel.startswith('internal/mailbox/'):
+            bad=[name for name in imports if '/internal/ingress/' in name or '/internal/delivery/' in name]
+            if bad:errors.append(rel+' imports another Go service namespace '+', '.join(bad))
+    if go_domain<1 or go_application<1:errors.append('declared Go domain/application layers were not found')
     if errors:raise RuntimeError('\n'.join(errors))
-    return {'main_java_files':len(java),'domain_files':checked_domain,'application_files':checked_application,'violations':0}
+    return {'runtime':'go','main_go_files':len(go),'go_domain_files':go_domain,
+            'go_application_files':go_application,'retained_java_files':len(java),'violations':0}
 
 def security():
     errors=[]
     tracked=subprocess.check_output(['git','ls-files','-z'],cwd=ROOT).decode().split('\0')
     signatures=[b'-----BEGIN '+b'PRIVATE KEY-----',b'AKIA'+b'[A-Z0-9]{16}',b'ghp_'+b'[A-Za-z0-9]{30,}',
                 b'github_pat_'+b'[A-Za-z0-9_]{40,}',b'xoxb-'+b'[A-Za-z0-9-]{20,}']
-    text_suffixes={'.md','.py','.java','.sql','.xml','.yml','.yaml','.json','.properties','.conf','.txt'}
+    text_suffixes={'.md','.py','.go','.java','.sql','.xml','.yml','.yaml','.json','.properties','.conf','.txt'}
     for rel in filter(None,tracked):
         path=ROOT/rel
         if path.suffix.lower() not in text_suffixes or not path.is_file() or path.stat().st_size>2*1024*1024:continue
@@ -190,15 +245,25 @@ def security():
         if required not in identity:errors.append('session cookie missing '+required)
     store=(ROOT/'backend/platform-common/src/main/java/dev/guihong/platform/S3ObjectStore.java').read_text(encoding='utf-8')
     if 'retryPolicy(RetryPolicy.none())' not in store:errors.append('S3 automatic retry policy is not explicitly disabled')
+    go_config=(ROOT/'internal/platform/config.go').read_text(encoding='utf-8')
+    for required in ('127.0.0.1:18080','127.0.0.1:18081','127.0.0.1:18082','127.0.0.1:12525'):
+        if required not in go_config:errors.append('Go service loopback binding missing '+required)
+    go_identity=(ROOT/'internal/mailbox/interfaces/http.go').read_text(encoding='utf-8')
+    for required in ('HttpOnly: true','SameSite: http.SameSiteStrictMode','Path: "/api"'):
+        if required not in go_identity:errors.append('Go session cookie missing '+required)
+    go_s3=(ROOT/'internal/platform/s3.go').read_text(encoding='utf-8')
+    for required in ('DisableKeepAlives:', 'Proxy:'):
+        if required not in go_s3:errors.append('Go S3 retry/proxy boundary missing '+required)
     if errors:raise RuntimeError('\n'.join(errors))
-    return {'credential_signatures':0,'published_ports':published,'loopback_services':3,'session_cookie_flags':3,'s3_sdk_retries':0}
+    return {'runtime':'go','credential_signatures':0,'published_ports':published,
+            'loopback_services':3,'session_cookie_flags':3,'s3_transport_retries':0}
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('gate',choices=['docs','seal','backend','architecture','security','hygiene','all'])
+    parser.add_argument('gate',choices=['docs','seal','backend','frontend','architecture','security','hygiene','all'])
     args = parser.parse_args()
-    gates = {'docs':docs,'seal':make_seal,'backend':backend,'architecture':architecture,'security':security,'hygiene':hygiene}
-    selected = ['docs','backend','architecture','security','hygiene'] if args.gate=='all' else [args.gate]
+    gates = {'docs':docs,'seal':make_seal,'backend':backend,'frontend':frontend,'architecture':architecture,'security':security,'hygiene':hygiene}
+    selected = ['docs','backend','frontend','architecture','security','hygiene'] if args.gate=='all' else [args.gate]
     print(json.dumps({key:gates[key]() for key in selected}, ensure_ascii=False,indent=2))
 
 if __name__ == '__main__':

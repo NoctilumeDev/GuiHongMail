@@ -18,7 +18,7 @@ import pymysql
 from veritrail.acceptance_plan import observation_spec_digest,seal_acceptance_plan
 from veritrail.acceptance_reporting import create_acceptance_bundle
 from veritrail.canonical import sha256_json
-import apps,lab
+import go_apps as apps,lab
 
 ROOT=lab.ROOT
 def git(*args):return subprocess.check_output(['git',*args],cwd=ROOT,text=True).strip()
@@ -38,6 +38,7 @@ def main():
     if git('status','--porcelain') or version('veritrail')!='0.13.0' or version('boto3')!='1.43.112':raise RuntimeError('Clean exact source and locked public dependencies required')
     source=git('rev-parse','HEAD');run='guihong-objects-'+uuid.uuid4().hex;out=lab.local_run(run,create=True)
     request={'source_sha':source,'lab_id':lab.load()['id'],'contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),
+        'go_contract_sha256':sha((ROOT/'docs/m0.1-go-runtime.md').read_bytes()),
         'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),
         'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.1.md').read_bytes()),'proxy_port':23306,
         'object_ids':{name:str(uuid.uuid4()) for name in ['mailbox','ingress','delivery','put_failure','rollback','unknown']}}
@@ -47,6 +48,7 @@ def main():
     def hard(id,path,value):return {'id':id,'severity':'HARD','left':{'requirement_id':'objects','path':'/facts/'+path},'operator':'eq','right':value}
     assertions=[hard('source','source_sha',source),hard('clean','source_clean',True),
         hard('contract','contract_sha256',request['contract_sha256']),
+        hard('go-contract','go_contract_sha256',request['go_contract_sha256']),
         hard('component','component_sha256',request['component_sha256']),
         hard('resource-contract','resource_contract_sha256',request['resource_contract_sha256'])]
     for role in lab.SERVICES:
@@ -110,6 +112,7 @@ def main():
     def require_http(label,result,expected):
         if result[0]['http']!=expected:raise RuntimeError(f'{label} returned HTTP {result[0]["http"]}, expected {expected}')
     facts={'source_sha':source,'source_clean':True,'contract_sha256':request['contract_sha256'],
+        'go_contract_sha256':request['go_contract_sha256'],
         'component_sha256':request['component_sha256'],
         'resource_contract_sha256':request['resource_contract_sha256'],'boundary':'M1_A05_OBJECTS_RECOVERY'}
     status='COMPLETED';proxy=None;mailbox_running=False
