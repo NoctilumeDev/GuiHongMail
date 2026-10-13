@@ -6,10 +6,11 @@
 | --- | --- |
 | M0 | `FROZEN`，17项冻结字节，摘要 `1feb3418b68f0f176645350196313076a8e113ee7b7f54273f9efac8218fc460` |
 | M0资格主线 | `b34783bd7b440cc466512986f0c74869a4c748e5`；仅文档/授权边界 |
-| M1 | `LOCAL_CANDIDATE_PASS / PROTECTED_MERGE_AND_EXACT_MAIN_PENDING`，候选 `4406d6daf7d91a323ff240e99a3de873d1b37238`；原资源失败保持非 PASS；[候选证据](acceptance/m1.md)、[资源合同修订 1.1](m1-resource-contract-1.1.md)、[基础合同](m1-plan.md)、[运行账册](run-ledger.md) |
-| M2–M6 | `AUTHORIZED / NOT_STARTED`，依前一阶段门禁连续串行推进 |
+| M1 | `QUALIFIED`，运行资格 main `51fe46533cc45d7ef5d010db6803165de0780905`；PR #4、main CI `38393031035`、fresh exact-main 三子门与资源聚合闭合；原非 PASS 保留；[资格证据](acceptance/m1.md)、[资源合同修订 1.1](m1-resource-contract-1.1.md)、[运行账册](run-ledger.md) |
+| M2 | `AUTHORIZED / NEXT`，依连续施工合同进入邮箱核心，不继承 M1 资格替代 M2 证据 |
+| M3–M6 | `AUTHORIZED / NOT_STARTED`，依前一阶段门禁连续串行推进 |
 | M7 | `DEFERRED_HUMAN_PARTICIPATION`，需用户另行开启 |
 | E1 | `NOT_AUTHORIZED` |
-| 运行时 | 仅取得本地 M1 候选证据；尚无主线 M1 资格、真实收发链路或 M2 产品资格 |
+| 运行时 | M1 底座取得主线资格；尚无 M2 邮箱产品、M3 真实投递、M4 Web 或 M5/M6 工程候选资格 |
 
-M0 状态发布已在 `da2ab376c1c84b0b487e3c33b5baafece320b105` 经原 PR 门、受保护合入、新 exact-main 文档门和具名公开读回闭合。M0既有身份与资格不因发布提交自动转移为M1资格。M1 的施工状态不是验收通过。
+M0 状态发布已在 `da2ab376c1c84b0b487e3c33b5baafece320b105` 经原 PR 门、受保护合入、新 exact-main 文档门和具名公开读回闭合。M1 资格独立绑定上述 main 运行身份，不由 M0 或本状态文字推导；M2 仍须建立自己的增量合同与证据。
