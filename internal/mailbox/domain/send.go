@@ -63,6 +63,11 @@ type IngressImport struct {
 	Members   []Member
 }
 
+type IngressImportResult struct {
+	Created        bool
+	AdoptedObjects bool
+}
+
 type SendRepository interface {
 	ExistingSend(context.Context, string, string) (*SendIntent, error)
 	FreezeSend(context.Context, SendFreeze) (SendIntent, error)
@@ -71,5 +76,5 @@ type SendRepository interface {
 	PendingSendEvents(context.Context, int) ([]OutboxEvent, error)
 	MarkSendEventPublished(context.Context, string, string) error
 	EnabledAccount(context.Context, string) (string, error)
-	ImportIngress(context.Context, IngressImport) (bool, error)
+	ImportIngress(context.Context, IngressImport) (IngressImportResult, error)
 }

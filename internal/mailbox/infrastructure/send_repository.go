@@ -160,11 +160,11 @@ func (r *MailboxRepository) EnabledAccount(ctx context.Context, address string) 
 	return id, err
 }
 
-func (r *MailboxRepository) ImportIngress(ctx context.Context, command domain.IngressImport) (bool, error) {
+func (r *MailboxRepository) ImportIngress(ctx context.Context, command domain.IngressImport) (domain.IngressImportResult, error) {
 	if err := r.ready(ctx); err != nil {
-		return false, err
+		return domain.IngressImportResult{}, err
 	}
-	created := false
+	result := domain.IngressImportResult{}
 	err := r.witness.Write(ctx, "ingress-import|"+command.SpoolID+"|"+command.RawSHA256, func(tx *sql.Tx) error {
 		existing := map[string]string{}
 		rows, err := tx.QueryContext(ctx, "SELECT recipient_account_id,raw_sha256 FROM ingress_import_receipts WHERE spool_id=? FOR UPDATE", command.SpoolID)
@@ -188,20 +188,30 @@ func (r *MailboxRepository) ImportIngress(ctx context.Context, command domain.In
 		if len(existing) == len(command.Members) {
 			return nil
 		}
-		created = true
+		result.Created = true
 		message := command.Imported
 		p := message.Parsed
-		if _, err := tx.ExecContext(ctx, `INSERT INTO message_contents(content_id,raw_object_id,raw_sha256,raw_size,message_id,from_address,from_name,subject,text_body,safe_html,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, message.ContentID, message.RawObjectID, message.RawSHA256, message.RawSize, nullString(p.MessageID), p.From.Address, nullString(p.From.Name), p.Subject, p.TextBody, p.SafeHTML, p.SentAt); err != nil {
-			return err
-		}
-		for _, recipient := range p.Recipients {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO message_recipients(content_id,recipient_kind,ordinal_no,address,display_name) VALUES(?,?,?,?,?)`, message.ContentID, recipient.Kind, recipient.Ordinal, recipient.Address, recipient.Name); err != nil {
+		contentID := ""
+		err = tx.QueryRowContext(ctx, "SELECT content_id FROM message_contents WHERE raw_sha256=? AND raw_size=? FOR UPDATE", message.RawSHA256, message.RawSize).Scan(&contentID)
+		if errors.Is(err, sql.ErrNoRows) {
+			contentID = message.ContentID
+			if _, err = tx.ExecContext(ctx, `INSERT INTO message_contents(content_id,raw_object_id,raw_sha256,raw_size,message_id,from_address,from_name,subject,text_body,safe_html,sent_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, contentID, message.RawObjectID, message.RawSHA256, message.RawSize, nullString(p.MessageID), p.From.Address, nullString(p.From.Name), p.Subject, p.TextBody, p.SafeHTML, p.SentAt); err != nil {
 				return err
 			}
+			result.AdoptedObjects = true
+		} else if err != nil {
+			return err
 		}
-		for ordinal, attachment := range message.Attachments {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO message_attachments(attachment_id,content_id,object_id,ordinal_no,file_name,media_type,sha256,byte_size) VALUES(?,?,?,?,?,?,?,?)`, attachment.ID, message.ContentID, attachment.ObjectID, ordinal, attachment.FileName, attachment.MediaType, attachment.SHA256, attachment.Size); err != nil {
-				return err
+		if result.AdoptedObjects {
+			for _, recipient := range p.Recipients {
+				if _, err = tx.ExecContext(ctx, `INSERT INTO message_recipients(content_id,recipient_kind,ordinal_no,address,display_name) VALUES(?,?,?,?,?)`, contentID, recipient.Kind, recipient.Ordinal, recipient.Address, recipient.Name); err != nil {
+					return err
+				}
+			}
+			for ordinal, attachment := range message.Attachments {
+				if _, err = tx.ExecContext(ctx, `INSERT INTO message_attachments(attachment_id,content_id,object_id,ordinal_no,file_name,media_type,sha256,byte_size) VALUES(?,?,?,?,?,?,?,?)`, attachment.ID, contentID, attachment.ObjectID, ordinal, attachment.FileName, attachment.MediaType, attachment.SHA256, attachment.Size); err != nil {
+					return err
+				}
 			}
 		}
 		for _, member := range command.Members {
@@ -213,7 +223,7 @@ func (r *MailboxRepository) ImportIngress(ctx context.Context, command domain.In
 				return invalid("MEMBER_ACCOUNT_UNAVAILABLE")
 			}
 			entry := uuid.NewString()
-			if _, err := tx.ExecContext(ctx, "INSERT INTO mailbox_entries(entry_id,account_id,content_id,folder,is_read) VALUES(?,?,?,?,?)", entry, member.AccountID, message.ContentID, member.Folder, member.Read); err != nil {
+			if _, err := tx.ExecContext(ctx, "INSERT INTO mailbox_entries(entry_id,account_id,content_id,folder,is_read) VALUES(?,?,?,?,?)", entry, member.AccountID, contentID, member.Folder, member.Read); err != nil {
 				return err
 			}
 			if _, err := tx.ExecContext(ctx, "INSERT INTO ingress_import_receipts(spool_id,recipient_account_id,raw_sha256,entry_id) VALUES(?,?,?,?)", command.SpoolID, member.AccountID, command.RawSHA256, entry); err != nil {
@@ -222,5 +232,5 @@ func (r *MailboxRepository) ImportIngress(ctx context.Context, command domain.In
 		}
 		return nil
 	})
-	return created, err
+	return result, err
 }

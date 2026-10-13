@@ -152,10 +152,15 @@ func (importer *IngressImporter) importMessage(ctx context.Context, event ingres
 		for _, recipient := range event.Recipients {
 			members = append(members, domain.Member{AccountID: recipient.AccountID, Folder: domain.Inbox, Read: false})
 		}
-		created, failure := importer.sends.ImportIngress(ctx, domain.IngressImport{SpoolID: event.SpoolID, RawSHA256: event.RawSHA256,
+		result, failure := importer.sends.ImportIngress(ctx, domain.IngressImport{SpoolID: event.SpoolID, RawSHA256: event.RawSHA256,
 			Imported: domain.ImportedMessage{ContentID: contentID, RawObjectID: rawBlob.ID, RawSHA256: rawBlob.SHA256, RawSize: rawBlob.Size, Parsed: parsed, Attachments: attachments}, Members: members})
-		if failure == nil && created {
-			return true, nil
+		if failure == nil {
+			if !result.AdoptedObjects {
+				for _, value := range references {
+					_ = importer.objects.Dereference(ctx, value.object, value.kind, value.id)
+				}
+			}
+			return result.Created, nil
 		}
 		err = failure
 	}
