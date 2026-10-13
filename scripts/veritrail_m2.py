@@ -155,9 +155,6 @@ def collect(out):
     status_cross, _, cross_body = alice.request('GET', '/api/mailbox/messages/' + private_b['entryId'])
     status_attachment, _, attachment_body = alice.request('GET', f"/api/mailbox/messages/{private_b['entryId']}/attachments/{private_b_detail['attachments'][0]['id']}")
     _, _, cross_after = alice.json('GET', '/api/mailbox/messages?folder=INBOX&size=30')
-
-    _, _, changed_a = alice.json('PATCH', '/api/mailbox/messages/' + shared_a['entryId'], {'version': shared_a['version'], 'read': True, 'folder': 'ARCHIVE'})
-    _, _, unchanged_b = bob.json('GET', '/api/mailbox/messages/' + shared_b['entryId'])
     before_invalid = len(alice_page['items'])
     invalid_status, _, invalid_body = alice.request('GET', '/api/mailbox/messages?folder=INBOX&size=1&cursor=invalid')
     _, _, page_one = alice.json('GET', '/api/mailbox/messages?folder=INBOX&size=1')
@@ -165,6 +162,9 @@ def collect(out):
     if page_one['nextCursor']:
         _, _, page_two = alice.json('GET', '/api/mailbox/messages?folder=INBOX&size=1&cursor=' + page_one['nextCursor'])
     _, _, search = alice.json('GET', '/api/mailbox/messages?folder=INBOX&size=30&q=ALICE-PRIVATE-MARKER')
+
+    _, _, changed_a = alice.json('PATCH', '/api/mailbox/messages/' + shared_a['entryId'], {'version': shared_a['version'], 'read': True, 'folder': 'ARCHIVE'})
+    _, _, unchanged_b = bob.json('GET', '/api/mailbox/messages/' + shared_b['entryId'])
 
     _, _, draft = alice.json('POST', '/api/mailbox/drafts', {'subject': '持久草稿', 'textBody': '初稿', 'htmlBody': '<b>初稿</b>', 'to': ['bob@guihong.test'], 'cc': [], 'bcc': [], 'mode': 'COMPOSE'}, expected=(201,))
     _, _, updated = alice.json('PUT', '/api/mailbox/drafts/' + draft['id'], draft_payload(draft,textBody='已更新'), expected=(200,))
