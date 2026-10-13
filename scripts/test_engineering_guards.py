@@ -32,6 +32,29 @@ class ContainerBudgetTest(unittest.TestCase):
 
 
 class OwnedCleanupTest(unittest.TestCase):
+    def test_start_archives_reused_pid_without_adopting_or_stopping_it(self):
+        owned={'lab_id':'lab','role':'mailbox','pid':123,'creation_ticks':1,'executable':str(apps.JAVA)}
+        reused={'creation_ticks':2,'executable':'C:/Windows/System32/other.exe'}
+        with tempfile.TemporaryDirectory() as directory:
+            records=Path(directory);record=records/'mailbox.json';record.write_text(json.dumps(owned))
+            with patch.object(apps,'PROCESSES',records),patch.object(apps.lab,'load',return_value={'id':'lab'}),\
+                 patch.object(apps,'process_identity',return_value=reused),patch.object(os,'kill') as terminate:
+                apps.archive_inactive_record(record,'mailbox')
+                self.assertFalse(record.exists())
+                self.assertEqual(1,len(list(records.glob('mailbox-pid-reused-*.json'))))
+                terminate.assert_not_called()
+
+    def test_start_refuses_when_exact_owned_pid_is_still_active(self):
+        owned={'lab_id':'lab','role':'mailbox','pid':123,'creation_ticks':1,'executable':str(apps.JAVA)}
+        current={'creation_ticks':1,'executable':str(apps.JAVA)}
+        with tempfile.TemporaryDirectory() as directory:
+            records=Path(directory);record=records/'mailbox.json';record.write_text(json.dumps(owned))
+            with patch.object(apps,'PROCESSES',records),patch.object(apps.lab,'load',return_value={'id':'lab'}),\
+                 patch.object(apps,'process_identity',return_value=current):
+                with self.assertRaisesRegex(RuntimeError,'Prior exact owned PID remains active'):
+                    apps.archive_inactive_record(record,'mailbox')
+                self.assertTrue(record.exists())
+
     def test_stop_refuses_force_when_pid_identity_changes(self):
         owned={'lab_id':'lab','role':'mailbox','pid':123,'creation_ticks':1,'executable':str(apps.JAVA)}
         changed={'creation_ticks':2,'executable':str(apps.JAVA)}

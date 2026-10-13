@@ -55,6 +55,17 @@ def process_identity(pid):
         return {'creation_ticks':values[0].value,'executable':name.value}
     finally:kernel.CloseHandle(ctypes.c_void_p(handle))
 
+def archive_inactive_record(record,role):
+    previous=json.loads(record.read_text(encoding='utf-8'))
+    if previous.get('lab_id')!=lab.load()['id'] or previous.get('role')!=role:
+        raise RuntimeError('Prior process record ownership changed; no implicit adoption')
+    current=process_identity(previous['pid'])
+    expected={k:previous[k] for k in ('creation_ticks','executable')}
+    if current==expected:
+        raise RuntimeError('Prior exact owned PID remains active; no implicit adoption')
+    state='pid-reused' if current is not None else 'exited'
+    record.rename(PROCESSES/(role+'-'+state+'-'+uuid.uuid4().hex+'.json'))
+
 def tcp_server_owners(port,client_port):
     """Return Windows PIDs owning the accepted side of one established loopback connection."""
     if os.name!='nt':raise RuntimeError('This pinned app profile is Windows native')
@@ -205,9 +216,7 @@ def start(database_ports=None):
     for role in lab.SERVICES:
         record=PROCESSES/(role+'.json')
         if record.exists():
-            previous=json.loads(record.read_text())
-            if process_identity(previous['pid']) is not None:raise RuntimeError('Prior PID remains active; no implicit adoption')
-            record.rename(PROCESSES/(role+'-exited-'+uuid.uuid4().hex+'.json'))
+            archive_inactive_record(record,role)
         with socket.socket() as s:
             if s.connect_ex(('127.0.0.1',PORTS[role]))==0:raise RuntimeError('Unknown listener on required app port')
         jar=artifacts[MODULES[role]]['path']

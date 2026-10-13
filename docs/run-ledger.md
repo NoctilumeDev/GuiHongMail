@@ -28,5 +28,6 @@
 | 2026-10-13T08:43:15Z | source `51de444a07dbbc0d5be227943b7b5f8a87fa35f4` 对象运行 `guihong-objects-ca75c8ed2afe4fe0b936c04507f0e3c0` COMPLETED / PASS；A05 子门全部硬断言成立，当前引用对象未被 GC，确定孤儿恰好回收 5 个，UNKNOWN 经 U/503/NOT_RECONCILED 后凭 receipt 恢复，损坏对象与缺日志均阻断，最终当前 unknown 夹具已 dereference、GC 为 DELETED 且 S3 404。此 PASS 只授予 exact source 的 A05 子门，不代替 M1 聚合、保护合入或 exact-main |
 | 2026-10-13T08:47:37.6831875Z | M1 公开静态门候选补齐：`scripts/check.py all` 现在有限检查四模块/三独立迁移、domain/application 依赖方向、跨服务源码引用、凭据特征、所有宿主发布端口与三应用 loopback、错误隐藏、会话 Cookie 标志及 S3 零自动重试；GitHub CI 增加 Java 17 全量 Maven verify 与 MySQL 查询属性 COMMIT 帧单元测试。当前本地静态门通过；尚未取得 PR/CI/main 资格 |
 | 2026-10-13T11:10:46.5010578Z | 人工介入 2：项目所有者确认 128 PID 与 NameServer 192 MiB 是 M1 实施参数，授权资源合同 1.1：Broker PID 192、NameServer 256 MiB。原限制下非 PASS 不变；14 GiB、10% 内存余量、16 PID 余量、完整 MQ 生命周期与全拓扑窗口保持，只允许一次干净复验，失败转替代队列评估 |
+| 2026-10-13T11:30:21.7645378Z | source `fc4160e9bede300404f0a5192fb823348b14ca63` 对象运行 `guihong-objects-f4c3d561a9334e70afe472133780e437` ERROR / PENDING。COMMIT U/503 与 receipt 恢复、引用保护、五个孤儿有界 GC、删除重入和损坏对象阻断已经形成事实；journal 缺失挑战重启前，Windows 复用刚退出 JVM 的 PID 数字，启动器只判断 PID 存在而误报旧归鸿进程仍活动。原 Plan/Evidence/Bundle 保留；修复只允许在创建时间或可执行文件不同且端口门仍清空时归档旧记录，不接管或终止复用该 PID 的进程 |
 
 环境可用窗口已恢复，首败不会被后续成功覆盖。主页参考文档按当前中文主线 `NoctilumeDev/NoctilumeDev-ZH@5fe4cddc76d883476d004147fcddfaa24ac06` 阅读；同名本地 profile 分支包含更晚的未合入补充，不把它当已发布事实。M6 结束时间、墙钟时长与 Release 身份尚不存在。
