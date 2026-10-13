@@ -1,0 +1,23 @@
+[
+  {
+    "Path": "docs/m0-seal.json",
+    "SHA256": "f624b1b76abfcd1b5b8400c6701273d0307f07a3ca79916490bc33385c174c63",
+    "Bytes": 2952,
+    "ExactMatch": true,
+    "CapturedAt": "2026-10-13T03:58:55.0427067Z"
+  },
+  {
+    "Path": "docs/contracts/delivery-lifecycle.md",
+    "SHA256": "eaa7f21d635a6beaf3cc01258650583b533dc5060d00aba29e93cb928f21afcf",
+    "Bytes": 3915,
+    "ExactMatch": true,
+    "CapturedAt": "2026-10-13T03:58:55.4386829Z"
+  },
+  {
+    "Path": "docs/contracts/storage-lifecycle.md",
+    "SHA256": "b7bf648384a8968bea8a583868ccf11fdb1d35e7d0d6a4c80528c788f7abfb08",
+    "Bytes": 4146,
+    "ExactMatch": true,
+    "CapturedAt": "2026-10-13T03:58:55.8504947Z"
+  }
+]

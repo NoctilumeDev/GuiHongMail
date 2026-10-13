@@ -2,7 +2,7 @@
 
 > 云水之间，归鸿有信。
 
-**状态：`M0_APPROVED / SEAL_PENDING / NO_RUNTIME` · 2026-10-13。** 用户已批准独立新仓库、UNKNOWN 默认暂停、仅排队取消和 SeaweedFS 选型，并授权补齐 M0 后连续施工 M1–M6。封存及 M1 门禁各自留证，不能将授权描述成运行时完成。见[授权与决定](docs/authorization.md)。
+**状态：`M0_FROZEN / M1_AUTHORIZED / NO_RUNTIME` · 2026-10-13。** M0 的 17 项合同/参考字节在受保护主线 `b34783b` 通过文档门、exact-main CI、公开 Core 0.13.0 文档裁决与有限公开原字节读回。用户已授权连续施工 M1–M6；当前尚无邮箱运行资格。当前阶段以[状态账册](docs/status.md)为准，封存制订时的 pending 标记保留在不可改写的合同原件中。见[授权](docs/authorization.md)与[M0 资格](docs/acceptance/m0.md)。
 
 ## 产品定位
 

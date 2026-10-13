@@ -1,0 +1,10 @@
+{
+  "source_sha": "b34783bd7b440cc466512986f0c74869a4c748e5",
+  "scope": "Exact public raw M0 seal and representative normative contracts only",
+  "paths": [
+    "docs/m0-seal.json",
+    "docs/contracts/delivery-lifecycle.md",
+    "docs/contracts/storage-lifecycle.md"
+  ],
+  "expected": "HTTP 200 and bytes identical to exact local Git checkout"
+}

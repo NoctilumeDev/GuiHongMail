@@ -1,0 +1,12 @@
+{
+  "boundary": "M0_DOCUMENTS_ONLY",
+  "bundle": "artifacts\\local\\guihong-m0-0b3e9364357b4371a6f2f9d4c76e9dbd\\bundle",
+  "control": "none",
+  "execution_status": "COMPLETED",
+  "expected": "PASS",
+  "identity": "guihong-m0-0b3e9364357b4371a6f2f9d4c76e9dbd",
+  "m0_digest": "1feb3418b68f0f176645350196313076a8e113ee7b7f54273f9efac8218fc460",
+  "public_core_version": "0.13.0",
+  "source_sha": "b34783bd7b440cc466512986f0c74869a4c748e5",
+  "verdict": "PASS"
+}

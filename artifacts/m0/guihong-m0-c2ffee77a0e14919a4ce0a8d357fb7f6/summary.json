@@ -1,0 +1,12 @@
+{
+  "boundary": "M0_DOCUMENTS_ONLY",
+  "bundle": "artifacts\\local\\guihong-m0-c2ffee77a0e14919a4ce0a8d357fb7f6\\bundle",
+  "control": "wrong-hash",
+  "execution_status": "COMPLETED",
+  "expected": "FAIL",
+  "identity": "guihong-m0-c2ffee77a0e14919a4ce0a8d357fb7f6",
+  "m0_digest": "1feb3418b68f0f176645350196313076a8e113ee7b7f54273f9efac8218fc460",
+  "public_core_version": "0.13.0",
+  "source_sha": "c7baf61c91ca1c4a5246455050b9718002f11bc2",
+  "verdict": "FAIL"
+}
