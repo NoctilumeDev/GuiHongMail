@@ -178,6 +178,8 @@ def main():
         if bob_id:
             try:call('mailbox','/internal/accounts/'+bob_id+'/enabled','POST',{'enabled':True},internal=True)
             except Exception:pass # Preserve failed cleanup; never edit database behind the witness.
+        try:apps.stop()
+        except Exception as cleanup:save(out/'application-cleanup-error.json',{'exception':type(cleanup).__name__,'message':str(cleanup)})
     facts['source_sha']=git('rev-parse','HEAD');facts['source_clean']=not bool(git('status','--porcelain'))
     save(out/'facts.json',facts)
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],

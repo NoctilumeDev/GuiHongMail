@@ -174,7 +174,8 @@ def build():
     root=lab.ROOT/'.artifacts/build';root.mkdir(exist_ok=True,parents=True)
     settings=root/'settings.xml'
     if not settings.exists():lab.write_new(settings,'<settings><proxies><proxy><id>scoped</id><active>true</active><protocol>http</protocol><host>127.0.0.1</host><port>7897</port><nonProxyHosts>127.0.0.1|localhost</nonProxyHosts></proxy></proxies></settings>\n')
-    target=root/('build-'+sha+'.log')
+    attempt=uuid.uuid4().hex
+    target=root/('build-'+sha+'-'+attempt+'.log')
     with target.open('x',encoding='utf-8') as log:
         p=subprocess.run([str(MVN),'-B','-ntp','-s',str(settings),'-Dmaven.repo.local='+str(lab.ROOT/'.artifacts/m2'),
             '-f',str(lab.ROOT/'backend/pom.xml'),'-Dguihong.source_sha='+sha,'verify'],cwd=lab.ROOT,env=environment(),stdout=log,stderr=subprocess.STDOUT,timeout=600)
@@ -185,7 +186,7 @@ def build():
         if not jar.is_file():raise RuntimeError('Build succeeded without expected artifact '+str(jar))
         artifacts.append({'module':module,'path':jar.relative_to(lab.ROOT).as_posix(),
                           'bytes':jar.stat().st_size,'sha256':hashlib.sha256(jar.read_bytes()).hexdigest()})
-    receipt={'schema':'GuiHongBuildReceipt/1.0','source_sha':sha,'exit_code':p.returncode,
+    receipt={'schema':'GuiHongBuildReceipt/1.0','source_sha':sha,'attempt_id':attempt,'exit_code':p.returncode,
              'log':target.relative_to(lab.ROOT).as_posix(),'log_sha256':hashlib.sha256(target.read_bytes()).hexdigest(),
              'artifacts':artifacts}
     lab.write_new(root/('build-'+sha+'.json'),json.dumps(receipt,indent=2,sort_keys=True)+'\n')

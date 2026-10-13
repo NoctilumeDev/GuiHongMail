@@ -146,7 +146,7 @@ def run(duration):
                  'full_topology':full_topology,'consecutive_high':high,'stop_reason':reason,'observation_error':error}
             log.write(json.dumps(row)+'\n');log.flush();os.fsync(log.fileno())
             if reason:
-                apps.stop();lab.assert_owned();lab.compose(['stop','--timeout','20'])
+                apps.stop();lab.assert_owned();lab.compose(['stop','--timeout','20']);apps.stop()
                 print(json.dumps({'stopped':reason,'evidence':str(target)}),flush=True);return 2
             time.sleep(5)
     print(json.dumps({'window_complete':duration,'evidence':str(target)}),flush=True);return 0
