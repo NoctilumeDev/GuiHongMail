@@ -24,7 +24,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcMailboxRepository implements MailboxRepository {
+public class JdbcMailboxRepository implements MailboxRepository {
     private static final String SUMMARY="""
         SELECT e.entry_id,e.content_id,e.folder,e.is_read,e.category_id,e.version_no,e.created_at,
                c.from_address,c.from_name,c.subject,c.text_body,c.sent_at,
