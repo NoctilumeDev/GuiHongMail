@@ -138,7 +138,8 @@ func (runtime *Runtime) Identity() map[string]any {
 }
 
 func (runtime *Runtime) RequireInternal(caller, authorization string) error {
-	if caller != "lab" || len(authorization) < 8 || authorization[:7] != "Bearer " ||
+	allowed := caller == "lab" || caller == "mailbox" || caller == "ingress" || caller == "delivery"
+	if !allowed || len(authorization) < 8 || authorization[:7] != "Bearer " ||
 		!Same(runtime.Config.InternalToken, authorization[7:]) {
 		return fmt.Errorf("internal authentication required")
 	}

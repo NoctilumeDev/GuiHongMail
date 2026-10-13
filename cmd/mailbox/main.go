@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -22,8 +23,15 @@ func main() {
 		mailboxRepository := infrastructure.NewMailboxRepository(runtime.Database, runtime.Witness, runtime.Writable)
 		mailbox := application.NewMailbox(mailboxRepository, infrastructure.MIMEParser{}, infrastructure.ConservativeHTML{}, runtime.Objects)
 		mailboxhttp.RegisterMailbox(mux, runtime, identity, mailbox)
+		sender := application.NewSender(mailboxRepository, mailboxRepository, infrastructure.MIMEParser{}, runtime.Objects)
+		mailboxhttp.RegisterSend(mux, runtime, identity, sender, mailboxRepository)
 		mailboxhttp.RegisterWeb(mux, "backend/mailbox-service/src/main/resources/static")
-	}, nil)
+	}, func(ctx context.Context, runtime *platform.Runtime) error {
+		mailboxRepository := infrastructure.NewMailboxRepository(runtime.Database, runtime.Witness, runtime.Writable)
+		sender := application.NewSender(mailboxRepository, mailboxRepository, infrastructure.MIMEParser{}, runtime.Objects)
+		importer := application.NewIngressImporter(mailboxRepository, infrastructure.MIMEParser{}, runtime.Objects)
+		return sender.Run(ctx, runtime, importer)
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
