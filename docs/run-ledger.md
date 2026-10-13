@@ -18,5 +18,7 @@
 | 2026-10-13T05:56:56Z | 原配置复现仍 Exit 255；退出前采样 263.8 MiB / 512 MiB、63 PIDs，但未捕获失败瞬间峰值。官方 5.5.0 ScheduleMessageService 按 delay level 启动线程，单机 profile 把默认 18 级收束到 3 级（1s/5s/10s），不提供用户定时发送、不改变 Delivery 重试义务；所有硬上限保持 |
 | 2026-10-13T06:11:23Z | source `9b7be12651ac5584de9ae1fc69aadbbff16f6918` 三模块编译成功；Broker 日志改为保留全部 INFO 的同步单出口后实际约 100 PIDs / 280 MiB，随后三服务真实启动、schema V1 迁移、三依赖就绪和正常退出。开发观察尚未封存正式 Plan，不宣称子门资格 |
 | 2026-10-13T06:26:44Z | source `4b84250969bc8ae811cfa8a6a604dd4a0c3676d7` 第一 foundation 运行 `guihong-foundation-f0c1dbe22e5e4a7bb9c66a4aa8066081` ERROR / PENDING；Mailbox 在启动时因 final Repository 不允许 Spring 异常转换代理退出，启动器随后遇退出进程的路径读取竞态。原应用日志与 Plan/Evidence/Bundle 保留；schema V2 已执行并有库外完成记录，后续不重置数据库 |
+| 2026-10-13T06:29:12Z | source `c826ae73b3d38bf7653fa2a3f0d6f47a70d9d805` foundation `guihong-foundation-cddc2405f0d24d668e5374d3dafdb43c` ERROR / PENDING；MQ 收发原生断言完成后 topic 清理 CODE 1。服务端与官方源码确认 disabled TimerWheel 被无条件引用，保留 native/broker 首败，按组件 1.1 重分配原 JVM 内存预算并撤销不兼容 workaround |
+| 2026-10-13T06:38:44Z | source `8f17555bf6613f8cb6c76220901f1bb703a2b95f` foundation `guihong-foundation-58a7736ac2bf4230afa6d34bccfd86cf` COMPLETED / PENDING；真实 MQ 收发与精确清理成功，Broker 约 304 MiB / 118 PIDs。Core 隐私层把名为 cookie / wrong_password 的非敏感状态投影整体遮蔽，5 条原断言无法读取。保留 PENDING；normalization 1.1 只保留非秘密 HTTP 事实并用中性投影名，原值预期及密码/Cookie 隐私规则不降低 |
 
 环境可用窗口已恢复，首败不会被后续成功覆盖。主页参考文档按当前中文主线 `NoctilumeDev/NoctilumeDev-ZH@5fe4cddcddc76d883476d004147fcddfaa24ac06` 阅读；同名本地 profile 分支包含更晚的未合入补充，不把它当已发布事实。M6 结束时间、墙钟时长与 Release 身份尚不存在。

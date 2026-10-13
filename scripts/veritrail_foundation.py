@@ -38,17 +38,18 @@ def main():
         assertions+=[hard(r+'-role','startup/'+r+'/service',r),hard(r+'-source','startup/'+r+'/source_sha',source),hard(r+'-state','startup/'+r+'/state','READY'),
             hard(r+'-ready','readiness/'+r+'/http',200),hard(r+'-jar','startup_jars/'+r,expected['jars'][r]),hard(r+'-own-db','database/'+r+'/own_crud','ROLLED_BACK'),
             hard(r+'-wrong-token','internal_wrong/'+r+'/http',401),hard(r+'-no-token','internal_anonymous/'+r+'/http',401),
+            hard(r+'-db-read','database/'+r+'/read_hash',sha(r.encode())),hard(r+'-db-delete','database/'+r+'/deleted_rows',1),
             hard(r+'-storage-down','dependency_down/'+r+'/http',503),hard(r+'-storage-restored','dependency_restored/'+r+'/http',200),hard(r+'-drain','drain/'+r+'/http',200),hard(r+'-shutdown','shutdown/'+r,True)]
     for i in range(12):assertions.append(hard('cross-db-'+str(i),'cross_database/'+str(i)+'/error_code',1142))
-    for name,code in {'alice_login':200,'bob_login':200,'wrong_password':401,'unknown_account':401,'alice_me':200,'alice_reads_bob':404,
+    for name,code in {'alice_login':200,'bob_login':200,'invalid_login':401,'unknown_account':401,'alice_me':200,'alice_reads_bob':404,
         'cookie_internal':401,'origin_login':403,'csrf_refresh':403,'refresh':200,'old_after_refresh':401,'logout':204,'after_logout':401,
         'bob_disabled':401,'rate_limit':429,'drained_login':503}.items():assertions.append(hard('http-'+name,'sessions/'+name+'/http',code))
-    assertions+=[hard('uniform-login-feedback','sessions/wrong_password/body',{'code':'AUTHENTICATION_FAILED'}),hard('uniform-unknown-feedback','sessions/unknown_account/body',{'code':'AUTHENTICATION_FAILED'}),
-        hard('http-only','cookie/httponly',True),hard('same-site','cookie/samesite','Strict'),hard('cookie-path','cookie/path','/api'),
+    assertions+=[hard('uniform-login-feedback','sessions/invalid_login/body',{'code':'AUTHENTICATION_FAILED'}),hard('uniform-unknown-feedback','sessions/unknown_account/body',{'code':'AUTHENTICATION_FAILED'}),
+        hard('http-only','session_attributes/httponly',True),hard('same-site','session_attributes/samesite','Strict'),hard('cookie-path','session_attributes/path','/api'),
         hard('external-relay','smtp/external_rcpt',550),hard('no-false-accept','smtp/local_rcpt',451),hard('no-data-responsibility','smtp/data',503),
         hard('mq-send','mq/send_status','SEND_OK'),hard('mq-pull','mq/pull_status','FOUND'),hard('mq-body','mq/received_sha256',sha(('归鸿真实 MQ 见证|'+expected['mq_topic']).encode())),
-        hard('mq-cleanup','mq/cleanup','EXACT_CREATED_TOPIC_AND_GROUP')]
-    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-foundation','version':1,
+        hard('mq-cleanup','mq/cleanup','EXACT_CREATED_TOPIC_AND_GROUP'),hard('broker-budget','broker/memory_limit',512*1024**2),hard('broker-no-oom','broker/oom_killed',False),hard('broker-pid-budget','broker/pid_limit',128)]
+    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-foundation','version':2,
         'subject':{'id':'guihong-m1-foundation-identity-smtp','version':source,'source_ref':'github:NoctilumeDev/GuiHongMail'},
         'question':'Do independent services, actual database identities, bounded sessions, rejecting SMTP and actual ordinary MQ satisfy M1 foundation obligations?',
         'governance':{'claim_owner_ref':'human:repository-owner','drafter_ref':'guihong:foundation-collector','seal_authority_ref':'human:repository-owner:guihong-m1-m6-20261013','seal_decision':'CONFIRMED'},
@@ -76,7 +77,11 @@ def main():
         with response:
             raw=response.read(1048577);value=json.loads(raw) if raw else None;status=response.code;set_cookie=response.headers.get('Set-Cookie')
         public=value
-        if isinstance(public,dict) and 'csrf' in public:public={**public,'csrf':'<REDACTED>'}
+        if isinstance(public,dict):
+            # Only public protocol observations, never nonce values or address material.
+            public={k:v for k,v in public.items() if k!='csrf'}
+            if isinstance(public.get('user'),dict):public['user']={k:v for k,v in public['user'].items() if k!='address'}
+            public.pop('address',None)
         result={'http':status,'body':public}
         event({'method':method,'service':role,'path':path,'result':result,'response_bytes':len(raw),'response_sha256':sha(raw)})
         return result,value,set_cookie
@@ -126,8 +131,8 @@ def main():
             sessions[name+'_login'],value,header=call('mailbox','/api/auth/login','POST',credentials['accounts'][name]);cookies[name]=header.split(';',1)[0];csrf[name]=value['csrf']
             if name=='alice':
                 from http.cookies import SimpleCookie
-                parsed=SimpleCookie();parsed.load(header);m=parsed['guihong_session'];facts['cookie']={'httponly':bool(m['httponly']),'samesite':m['samesite'],'path':m['path']}
-        sessions['wrong_password']=call('mailbox','/api/auth/login','POST',{'address':credentials['accounts']['alice']['address'],'password':'wrong-synthetic-password'})[0]
+                parsed=SimpleCookie();parsed.load(header);m=parsed['guihong_session'];facts['session_attributes']={'httponly':bool(m['httponly']),'samesite':m['samesite'],'path':m['path']}
+        sessions['invalid_login']=call('mailbox','/api/auth/login','POST',{'address':credentials['accounts']['alice']['address'],'password':'wrong-synthetic-password'})[0]
         sessions['unknown_account']=call('mailbox','/api/auth/login','POST',{'address':'absent@guihong.test','password':'wrong-synthetic-password'})[0]
         sessions['alice_me']=call('mailbox','/api/auth/me',cookie=cookies['alice'])[0]
         sessions['alice_reads_bob']=call('mailbox','/api/accounts/'+bob_id,cookie=cookies['alice'])[0]
@@ -155,6 +160,8 @@ def main():
             result=subprocess.run([str(apps.MVN),'-B','-ntp','-s',str(ROOT/'.artifacts/build/settings.xml'),'-Dmaven.repo.local='+str(ROOT/'.artifacts/m2'),'-f',str(ROOT/'backend/pom.xml'),'-pl','platform-common','-Dtest=OwnedMqIntegrationTest','test'],cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT,timeout=180)
         if (out/'mq-native.json').exists():facts['mq']=json.loads((out/'mq-native.json').read_text())
         if result.returncode:raise RuntimeError('Real MQ native probe failed; original log preserved')
+        broker=json.loads(subprocess.check_output([lab.docker(),'inspect',lab.load()['id']+'-broker-1'],text=True,encoding='utf-8'))[0]
+        facts['broker']={'memory_limit':broker['HostConfig']['Memory'],'pid_limit':broker['HostConfig']['PidsLimit'],'oom_killed':broker['State']['OOMKilled'],'jvm':next(x for x in broker['Config']['Env'] if x.startswith('HEAP_OPTS='))}
         lab.compose(['stop','--timeout','20','seaweedfs'],capture=True)
         facts['dependency_down']={r:call(r,'/health/ready')[0] for r in lab.SERVICES}
         lab.compose(['up','-d','seaweedfs'],capture=True)
@@ -178,8 +185,8 @@ def main():
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],
         'observation_spec_digest':observation_spec_digest(spec),'request_seal_digest':sha256_json(expected),'collection_session_id':run,
         'collector_role':'guihong-foundation-collector','coverage':'COMPLETE' if status=='COMPLETED' else 'ERROR',
-        'normalization_semantics_version':'guihong-foundation/1.0','facts_digest':sha256_json(facts)}
-    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-foundation/1.0',
+        'normalization_semantics_version':'guihong-foundation/1.1','facts_digest':sha256_json(facts)}
+    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-foundation/1.1',
         'captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
     save(out/'evidence.json',evidence)
     report=create_acceptance_bundle(plan=plan,evidence_paths=[out/'evidence.json'],output=out/'bundle',acceptance_id=run,execution_status=status)
