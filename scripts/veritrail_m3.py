@@ -13,6 +13,7 @@ import socket
 import subprocess
 import threading
 import time
+import traceback
 import uuid
 from http.cookies import SimpleCookie
 
@@ -223,6 +224,8 @@ def smtp_transaction(raw, recipients, *, sender='outside@example.test', port=125
         if any(item[1] == 250 for item in result['rcpt']):
             code, message = client.data(raw)
             result['data'] = [code, message.decode(errors='replace')]
+    except smtplib.SMTPResponseException as failure:
+        result['data'] = [failure.smtp_code, failure.smtp_error.decode(errors='replace')]
     except (smtplib.SMTPException, OSError) as failure:
         result['exception'] = type(failure).__name__ + ': ' + str(failure)
     finally:
@@ -373,6 +376,8 @@ def collect(out):
         try:
             code, message = s3_client.data(raw_message('s3-failure'))
             s3_failure = {'prefix': s3_prefix, 'data': [code, message.decode(errors='replace')]}
+        except smtplib.SMTPResponseException as failure:
+            s3_failure = {'prefix': s3_prefix, 'data': [failure.smtp_code, failure.smtp_error.decode(errors='replace')]}
         except (smtplib.SMTPException, OSError) as failure:
             s3_failure = {'prefix': s3_prefix, 'exception': type(failure).__name__ + ': ' + str(failure)}
     finally:
@@ -392,6 +397,8 @@ def collect(out):
     try:
         code, message = retained_client.data(raw_message(retained_subject, 'RETAINED'))
         retained = {'prefix': retained_prefix, 'data': [code, message.decode(errors='replace')]}
+    except smtplib.SMTPResponseException as failure:
+        retained = {'prefix': retained_prefix, 'data': [failure.smtp_code, failure.smtp_error.decode(errors='replace')]}
     except (smtplib.SMTPException, OSError) as failure:
         retained = {'prefix': retained_prefix, 'exception': type(failure).__name__ + ': ' + str(failure)}
     finally:
@@ -436,6 +443,8 @@ def collect(out):
         try:
             code, message = commit_client.data(commit_raw)
             commit_result.update(data=[code, message.decode(errors='replace')])
+        except smtplib.SMTPResponseException as failure:
+            commit_result.update(data=[failure.smtp_code, failure.smtp_error.decode(errors='replace')])
         except (smtplib.SMTPException, OSError) as failure:
             commit_result.update(exception=type(failure).__name__ + ': ' + str(failure))
     commit_thread = threading.Thread(target=submit_commit_unknown)
@@ -687,7 +696,8 @@ def main():
         else:
             facts=collect(out)
     except Exception as failure:
-        status='ERROR'; error={'exception_type':type(failure).__name__,'message':str(failure)}
+        status='ERROR'; error={'exception_type':type(failure).__name__,'message':str(failure),
+                              'traceback':traceback.format_exc()}
         facts={'source_sha':source,'cases':{},'boundary':'M3_SMTP_AND_DELIVERY_ONLY'}
         save(out/'collection-error.json',error)
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],
