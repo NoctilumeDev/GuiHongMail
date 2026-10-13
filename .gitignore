@@ -1,0 +1,24 @@
+# This M0 archive itself contains only draft docs; templates for future repo
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+secrets/
+.artifacts/
+artifacts/local/
+**/target/
+**/build/
+**/node_modules/
+**/.venv/
+**/.gradle/
+**/.idea/
+**/.vscode/
+*.log
+*.eml
+*.mbox
+*.sqlite
+.DS_Store
