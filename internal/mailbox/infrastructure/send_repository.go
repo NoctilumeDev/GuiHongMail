@@ -100,7 +100,7 @@ func (r *MailboxRepository) FreezeSend(ctx context.Context, command domain.SendF
 		if _, err := tx.ExecContext(ctx, `INSERT INTO send_intents(intent_id,account_id,draft_id,draft_version,request_key,payload_sha256,dispatch_scope_id,content_id,raw_object_id,raw_sha256,raw_size,sender_address,envelope_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`, command.IntentID, command.AccountID, command.Draft.ID, command.Draft.Version, command.RequestKey, command.PayloadSHA256, command.DispatchScopeID, command.ContentID, command.RawObjectID, command.RawSHA256, command.RawSize, command.SenderAddress, string(envelope)); err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO mailbox_outbox(event_id,aggregate_id,topic,message_key,payload) VALUES(?,?, 'guihong.mail.send.v1',?,?)`, command.OutboxEventID, command.IntentID, "send:"+command.IntentID, string(command.OutboxPayload)); err != nil {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO mailbox_outbox(event_id,aggregate_id,topic,message_key,payload) VALUES(?,?, 'guihong_mail_send_v1',?,?)`, command.OutboxEventID, command.IntentID, "send:"+command.IntentID, string(command.OutboxPayload)); err != nil {
 			return err
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE r FROM object_refs r JOIN draft_attachments a ON a.attachment_id=r.ref_id AND r.ref_kind='DRAFT_ATTACHMENT' WHERE a.draft_id=?`, command.Draft.ID); err != nil {

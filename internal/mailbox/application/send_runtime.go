@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const ingressTopic = "guihong.ingress.accepted.v1"
+const ingressTopic = "guihong_ingress_accepted_v1"
 
 type ingressEvent struct {
 	Version       int    `json:"version"`

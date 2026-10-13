@@ -18,6 +18,7 @@ GO = Path('D:/DevTools/Go/go1.27.2/bin/go.exe')
 NPM = Path('D:/Node.js/current/npm.cmd')
 PORTS = {'mailbox': 18080, 'ingress': 18081, 'delivery': 18082}
 COMMANDS = {'mailbox': './cmd/mailbox', 'ingress': './cmd/ingress', 'delivery': './cmd/delivery'}
+TOPICS = ('guihong_mail_send_v1', 'guihong_ingress_accepted_v1')
 CONSUMER_GROUPS = ('guihong_mailbox_import_v1', 'guihong_delivery_v1')
 PROCESSES = lab.LAB / 'go-applications'
 process_identity = apps.process_identity
@@ -244,7 +245,7 @@ def request(role, path, method='GET'):
     return json.loads(body)
 
 
-def ensure_consumer_groups():
+def ensure_mq_bindings():
     state = lab.load()
     candidates = subprocess.check_output(
         [lab.docker(), 'ps', '-q', '--filter', 'label=com.docker.compose.project=' + state['id'],
@@ -257,8 +258,21 @@ def ensure_consumer_groups():
     labels = inspected['Config'].get('Labels') or {}
     if labels.get('guihong.owner') != state['id'] or labels.get('com.docker.compose.service') != 'broker':
         raise RuntimeError('RocketMQ broker ownership changed before group provisioning')
-    log_path = PROCESSES / ('consumer-groups-' + uuid.uuid4().hex + '.log')
+    log_path = PROCESSES / ('mq-bindings-' + uuid.uuid4().hex + '.log')
     with log_path.open('xb') as output:
+        for topic in TOPICS:
+            result = subprocess.run(
+                [lab.docker(), 'exec', broker, '/home/rocketmq/rocketmq-5.5.0/bin/mqadmin',
+                 'updateTopic', '-n', 'namesrv:9876', '-b', '127.0.0.1:20911', '-t', topic,
+                 '-r', '1', '-w', '1'], stdout=output, stderr=subprocess.STDOUT, timeout=30)
+            if result.returncode:
+                raise RuntimeError('RocketMQ topic provisioning failed; retained ' + str(log_path))
+            result = subprocess.run(
+                [lab.docker(), 'exec', broker, '/home/rocketmq/rocketmq-5.5.0/bin/mqadmin',
+                 'topicRoute', '-n', 'namesrv:9876', '-t', topic],
+                stdout=output, stderr=subprocess.STDOUT, timeout=30)
+            if result.returncode:
+                raise RuntimeError('RocketMQ topic route readback failed; retained ' + str(log_path))
         for group in CONSUMER_GROUPS:
             result = subprocess.run(
                 [lab.docker(), 'exec', broker, '/home/rocketmq/rocketmq-5.5.0/bin/mqadmin',
@@ -280,8 +294,8 @@ def start(database_ports=None):
     credentials = private()
     database_ports = database_ports or {}
     PROCESSES.mkdir(exist_ok=True)
-    group_log = ensure_consumer_groups()
-    print(json.dumps({'consumer_groups': list(CONSUMER_GROUPS), 'log': str(group_log)}))
+    group_log = ensure_mq_bindings()
+    print(json.dumps({'topics': list(TOPICS), 'consumer_groups': list(CONSUMER_GROUPS), 'log': str(group_log)}))
     for role in lab.SERVICES:
         record = PROCESSES / (role + '.json')
         if record.exists():

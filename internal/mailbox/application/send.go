@@ -20,7 +20,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const sendTopic = "guihong.mail.send.v1"
+const sendTopic = "guihong_mail_send_v1"
 
 var requestKeyPattern = regexp.MustCompile(`^[\x21-\x7e]{1,128}$`)
 

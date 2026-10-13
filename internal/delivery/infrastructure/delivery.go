@@ -19,7 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const sendTopic = "guihong.mail.send.v1"
+const sendTopic = "guihong_mail_send_v1"
 
 var (
 	errNoJob       = errors.New("no delivery job")

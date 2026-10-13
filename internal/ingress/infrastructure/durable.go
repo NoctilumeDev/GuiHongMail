@@ -20,7 +20,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const ingressEventTopic = "guihong.ingress.accepted.v1"
+const ingressEventTopic = "guihong_ingress_accepted_v1"
 
 type acceptedRecipient struct {
 	AccountID string `json:"accountId"`
@@ -159,7 +159,7 @@ func persistSpool(ctx context.Context, runtime *platform.Runtime, from string, r
 				return err
 			}
 		}
-		_, err := tx.ExecContext(ctx, `INSERT INTO ingress_outbox(event_id,aggregate_id,topic,message_key,payload) VALUES(?,?, 'guihong.ingress.accepted.v1',?,?)`, uuid.NewString(), spoolID, "ingress:"+spoolID, string(payload))
+		_, err := tx.ExecContext(ctx, `INSERT INTO ingress_outbox(event_id,aggregate_id,topic,message_key,payload) VALUES(?,?, 'guihong_ingress_accepted_v1',?,?)`, uuid.NewString(), spoolID, "ingress:"+spoolID, string(payload))
 		return err
 	})
 	if err != nil {
