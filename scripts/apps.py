@@ -6,6 +6,7 @@ import http.client
 import json
 import os
 from pathlib import Path
+import signal
 import socket
 import subprocess
 import time
@@ -53,6 +54,17 @@ def process_identity(pid):
         if exit_code.value!=259:return None
         return {'creation_ticks':values[0].value,'executable':name.value}
     finally:kernel.CloseHandle(ctypes.c_void_p(handle))
+
+def archive_inactive_record(record,role):
+    previous=json.loads(record.read_text(encoding='utf-8'))
+    if previous.get('lab_id')!=lab.load()['id'] or previous.get('role')!=role:
+        raise RuntimeError('Prior process record ownership changed; no implicit adoption')
+    current=process_identity(previous['pid'])
+    expected={k:previous[k] for k in ('creation_ticks','executable')}
+    if current==expected:
+        raise RuntimeError('Prior exact owned PID remains active; no implicit adoption')
+    state='pid-reused' if current is not None else 'exited'
+    record.rename(PROCESSES/(role+'-'+state+'-'+uuid.uuid4().hex+'.json'))
 
 def tcp_server_owners(port,client_port):
     """Return Windows PIDs owning the accepted side of one established loopback connection."""
@@ -145,10 +157,18 @@ def prepare():
         root=lab.LAB/'witness'/role
         if root.exists():raise RuntimeError('Witness already exists; no reset/adopt operation')
         db=credentials['database'][role]
-        with pymysql.connect(host='127.0.0.1',port=13306,user=db['user'],password=db['password'],database=db['schema'],connect_timeout=5) as c:
-            with c.cursor() as q:
-                q.execute('SHOW TABLES');tables=q.fetchall()
-                q.execute('SELECT DATABASE(),CURRENT_USER(),VERSION()');binding=q.fetchone()
+        deadline=time.monotonic()+60
+        while True:
+            try:
+                with pymysql.connect(host='127.0.0.1',port=13306,user=db['user'],password=db['password'],database=db['schema'],connect_timeout=5) as c:
+                    with c.cursor() as q:
+                        q.execute('SHOW TABLES');tables=q.fetchall()
+                        q.execute('SELECT DATABASE(),CURRENT_USER(),VERSION()');binding=q.fetchone()
+                break
+            except pymysql.err.OperationalError as error:
+                code=error.args[0] if error.args else None
+                if code not in {2003,2013} or time.monotonic()>=deadline:raise
+                time.sleep(.5)
         if tables:raise RuntimeError('Bootstrap refused for a non-virgin schema')
         observations.append({'service':role,'schema':binding[0],'database_identity':binding[1],'version':binding[2],'tables':[]})
     # No filesystem authority is created until all three independent schemas are known virgin.
@@ -166,7 +186,8 @@ def build():
     root=lab.ROOT/'.artifacts/build';root.mkdir(exist_ok=True,parents=True)
     settings=root/'settings.xml'
     if not settings.exists():lab.write_new(settings,'<settings><proxies><proxy><id>scoped</id><active>true</active><protocol>http</protocol><host>127.0.0.1</host><port>7897</port><nonProxyHosts>127.0.0.1|localhost</nonProxyHosts></proxy></proxies></settings>\n')
-    target=root/('build-'+sha+'.log')
+    attempt=uuid.uuid4().hex
+    target=root/('build-'+sha+'-'+attempt+'.log')
     with target.open('x',encoding='utf-8') as log:
         p=subprocess.run([str(MVN),'-B','-ntp','-s',str(settings),'-Dmaven.repo.local='+str(lab.ROOT/'.artifacts/m2'),
             '-f',str(lab.ROOT/'backend/pom.xml'),'-Dguihong.source_sha='+sha,'verify'],cwd=lab.ROOT,env=environment(),stdout=log,stderr=subprocess.STDOUT,timeout=600)
@@ -177,7 +198,7 @@ def build():
         if not jar.is_file():raise RuntimeError('Build succeeded without expected artifact '+str(jar))
         artifacts.append({'module':module,'path':jar.relative_to(lab.ROOT).as_posix(),
                           'bytes':jar.stat().st_size,'sha256':hashlib.sha256(jar.read_bytes()).hexdigest()})
-    receipt={'schema':'GuiHongBuildReceipt/1.0','source_sha':sha,'exit_code':p.returncode,
+    receipt={'schema':'GuiHongBuildReceipt/1.0','source_sha':sha,'attempt_id':attempt,'exit_code':p.returncode,
              'log':target.relative_to(lab.ROOT).as_posix(),'log_sha256':hashlib.sha256(target.read_bytes()).hexdigest(),
              'artifacts':artifacts}
     lab.write_new(root/('build-'+sha+'.json'),json.dumps(receipt,indent=2,sort_keys=True)+'\n')
@@ -195,9 +216,7 @@ def start(database_ports=None):
     for role in lab.SERVICES:
         record=PROCESSES/(role+'.json')
         if record.exists():
-            previous=json.loads(record.read_text())
-            if process_identity(previous['pid']) is not None:raise RuntimeError('Prior PID remains active; no implicit adoption')
-            record.rename(PROCESSES/(role+'-exited-'+uuid.uuid4().hex+'.json'))
+            archive_inactive_record(record,role)
         with socket.socket() as s:
             if s.connect_ex(('127.0.0.1',PORTS[role]))==0:raise RuntimeError('Unknown listener on required app port')
         jar=artifacts[MODULES[role]]['path']
@@ -235,12 +254,27 @@ def stop():
         if owned['lab_id']!=lab.load()['id'] or current!={k:owned[k] for k in ('creation_ticks','executable')}:
             raise RuntimeError('PID ownership changed; stop without mutation')
         if Path(current['executable']).resolve()!=JAVA.resolve():raise RuntimeError('Owned executable mismatch')
-        request(role,'/internal/drain','POST');request(role,'/internal/shutdown','POST')
+        graceful=True
+        try:request(role,'/internal/drain','POST');request(role,'/internal/shutdown','POST')
+        except Exception:graceful=False
         until=time.monotonic()+30
         while time.monotonic()<until:
-            if process_identity(owned['pid']) is None:print(json.dumps({'stopped':role,'pid':owned['pid']}));break
+            if process_identity(owned['pid']) is None:print(json.dumps({'stopped':role,'pid':owned['pid'],'mode':'graceful' if graceful else 'exited'}));break
+            if not graceful:break
             time.sleep(.5)
-        else:raise RuntimeError('Owned application shutdown timeout; no unverified kill')
+        else:graceful=False
+        if process_identity(owned['pid']) is not None:
+            current=process_identity(owned['pid'])
+            if (owned['lab_id']!=lab.load()['id'] or current!={k:owned[k] for k in ('creation_ticks','executable')}
+                    or Path(current['executable']).resolve()!=JAVA.resolve()):
+                raise RuntimeError('PID ownership changed; force stop without mutation')
+            os.kill(owned['pid'],signal.SIGTERM)
+            until=time.monotonic()+10
+            while time.monotonic()<until:
+                if process_identity(owned['pid']) is None:
+                    print(json.dumps({'stopped':role,'pid':owned['pid'],'mode':'forced-owned-pid'}));break
+                time.sleep(.25)
+            else:raise RuntimeError('Exact owned PID did not exit after forced cleanup')
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('action',choices=['prepare','build','start','stop','status']);a=p.parse_args()

@@ -10,6 +10,62 @@ from unittest.mock import patch
 
 import apps
 import lab
+import resource_guard
+
+
+class ContainerBudgetTest(unittest.TestCase):
+    def test_docker_memory_units_are_converted_without_treating_host_total_as_container_use(self):
+        self.assertEqual(313 * 1024**2 + int(.9 * 1024**2), resource_guard.parse_size('313.9MiB'))
+        self.assertEqual(153300000, resource_guard.parse_size('153.3MB'))
+        with self.assertRaisesRegex(RuntimeError, 'Unsupported Docker resource size'):
+            resource_guard.parse_size('61.3%')
+
+    def test_container_pid_and_memory_headroom_are_hard_resource_witnesses(self):
+        healthy = {'running': True, 'oom_killed': False, 'memory_headroom_ratio': .10, 'pid_headroom': 16}
+        self.assertIsNone(resource_guard.container_violation([healthy]))
+        self.assertEqual('CONTAINER_PID_HEADROOM_STOP_LINE',
+                         resource_guard.container_violation([{**healthy, 'pid_headroom': 15}]))
+        self.assertEqual('CONTAINER_MEMORY_HEADROOM_STOP_LINE',
+                         resource_guard.container_violation([{**healthy, 'memory_headroom_ratio': .099}]))
+        self.assertEqual('CONTAINER_OOM_STOP_LINE',
+                         resource_guard.container_violation([{**healthy, 'oom_killed': True}]))
+
+
+class OwnedCleanupTest(unittest.TestCase):
+    def test_start_archives_reused_pid_without_adopting_or_stopping_it(self):
+        owned={'lab_id':'lab','role':'mailbox','pid':123,'creation_ticks':1,'executable':str(apps.JAVA)}
+        reused={'creation_ticks':2,'executable':'C:/Windows/System32/other.exe'}
+        with tempfile.TemporaryDirectory() as directory:
+            records=Path(directory);record=records/'mailbox.json';record.write_text(json.dumps(owned))
+            with patch.object(apps,'PROCESSES',records),patch.object(apps.lab,'load',return_value={'id':'lab'}),\
+                 patch.object(apps,'process_identity',return_value=reused),patch.object(os,'kill') as terminate:
+                apps.archive_inactive_record(record,'mailbox')
+                self.assertFalse(record.exists())
+                self.assertEqual(1,len(list(records.glob('mailbox-pid-reused-*.json'))))
+                terminate.assert_not_called()
+
+    def test_start_refuses_when_exact_owned_pid_is_still_active(self):
+        owned={'lab_id':'lab','role':'mailbox','pid':123,'creation_ticks':1,'executable':str(apps.JAVA)}
+        current={'creation_ticks':1,'executable':str(apps.JAVA)}
+        with tempfile.TemporaryDirectory() as directory:
+            records=Path(directory);record=records/'mailbox.json';record.write_text(json.dumps(owned))
+            with patch.object(apps,'PROCESSES',records),patch.object(apps.lab,'load',return_value={'id':'lab'}),\
+                 patch.object(apps,'process_identity',return_value=current):
+                with self.assertRaisesRegex(RuntimeError,'Prior exact owned PID remains active'):
+                    apps.archive_inactive_record(record,'mailbox')
+                self.assertTrue(record.exists())
+
+    def test_stop_refuses_force_when_pid_identity_changes(self):
+        owned={'lab_id':'lab','role':'mailbox','pid':123,'creation_ticks':1,'executable':str(apps.JAVA)}
+        changed={'creation_ticks':2,'executable':str(apps.JAVA)}
+        with tempfile.TemporaryDirectory() as directory:
+            records=Path(directory);(records/'mailbox.json').write_text(json.dumps(owned))
+            with patch.object(apps,'PROCESSES',records),patch.object(apps.lab,'SERVICES',('mailbox',)),\
+                 patch.object(apps.lab,'load',return_value={'id':'lab'}),patch.object(apps,'process_identity',return_value=changed),\
+                 patch.object(os,'kill') as terminate:
+                with self.assertRaisesRegex(RuntimeError,'PID ownership changed'):
+                    apps.stop()
+                terminate.assert_not_called()
 
 
 class BuildReceiptTest(unittest.TestCase):

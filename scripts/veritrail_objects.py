@@ -38,13 +38,17 @@ def main():
     if git('status','--porcelain') or version('veritrail')!='0.13.0' or version('boto3')!='1.43.112':raise RuntimeError('Clean exact source and locked public dependencies required')
     source=git('rev-parse','HEAD');run='guihong-objects-'+uuid.uuid4().hex;out=lab.local_run(run,create=True)
     request={'source_sha':source,'lab_id':lab.load()['id'],'contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),
-        'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),'proxy_port':23306,
+        'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),
+        'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.1.md').read_bytes()),'proxy_port':23306,
         'object_ids':{name:str(uuid.uuid4()) for name in ['mailbox','ingress','delivery','put_failure','rollback','unknown']}}
-    spec={'id':'objects-observation','contract':{'id':'guihong-objects','version':'1.0'},'evidence_type':'guihong.objects',
+    spec={'id':'objects-observation','contract':{'id':'guihong-objects','version':'1.1'},'evidence_type':'guihong.objects',
         'coordinates':request,'projections':['source_sha','positive','put_failure','known_rollback','commit_unknown','gc','integrity','journal_recovery','final_cleanup'],
         'canonicalization_profile':'veritrail-json-c14n/1'}
     def hard(id,path,value):return {'id':id,'severity':'HARD','left':{'requirement_id':'objects','path':'/facts/'+path},'operator':'eq','right':value}
-    assertions=[hard('source','source_sha',source),hard('clean','source_clean',True),hard('contract','contract_sha256',request['contract_sha256']),hard('component','component_sha256',request['component_sha256'])]
+    assertions=[hard('source','source_sha',source),hard('clean','source_clean',True),
+        hard('contract','contract_sha256',request['contract_sha256']),
+        hard('component','component_sha256',request['component_sha256']),
+        hard('resource-contract','resource_contract_sha256',request['resource_contract_sha256'])]
     for role in lab.SERVICES:
         assertions += [hard(role+'-stage','positive/'+role+'/stage_http',200),hard(role+'-reference','positive/'+role+'/reference_http',200),
             hard(role+'-read','positive/'+role+'/read_http',200),hard(role+'-bytes','positive/'+role+'/read_sha256',sha((role+'|'+run+'|归鸿对象').encode())),
@@ -60,7 +64,7 @@ def main():
         hard('journal-missing','journal_recovery/readiness_missing/http',503),hard('journal-restored','journal_recovery/readiness_restored/http',200),
         hard('cleanup-deref','final_cleanup/dereference_http',204),hard('cleanup-gc','final_cleanup/gc_http',200),
         hard('cleanup-state','final_cleanup/database_state','DELETED'),hard('cleanup-object','final_cleanup/s3_http',404)]
-    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-objects','version':1,
+    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-objects','version':2,
         'subject':{'id':'guihong-m1-a05','version':source,'source_ref':'github:NoctilumeDev/GuiHongMail'},
         'question':'Do standard S3 application writes, refs, native commit ambiguity, bounded GC and recovery fail closed under the declared M1 mechanisms?',
         'governance':{'claim_owner_ref':'human:repository-owner','drafter_ref':'guihong:objects-collector','seal_authority_ref':'human:repository-owner:guihong-m1-m6-20261013','seal_decision':'CONFIRMED'},
@@ -105,7 +109,9 @@ def main():
     def dereference(role,name):return call(role,f"/internal/storage/objects/{request['object_ids'][name]}/references",'DELETE',{'kind':'qualification','referenceId':run})
     def require_http(label,result,expected):
         if result[0]['http']!=expected:raise RuntimeError(f'{label} returned HTTP {result[0]["http"]}, expected {expected}')
-    facts={'source_sha':source,'source_clean':True,'contract_sha256':request['contract_sha256'],'component_sha256':request['component_sha256'],'boundary':'M1_A05_OBJECTS_RECOVERY'}
+    facts={'source_sha':source,'source_clean':True,'contract_sha256':request['contract_sha256'],
+        'component_sha256':request['component_sha256'],
+        'resource_contract_sha256':request['resource_contract_sha256'],'boundary':'M1_A05_OBJECTS_RECOVERY'}
     status='COMPLETED';proxy=None;mailbox_running=False
     try:
         proxy_root=lab.LAB/('mysql-commit-proxy-'+run);proxy_log=out/'mysql-commit-proxy.log'
@@ -224,8 +230,8 @@ def main():
     facts['source_sha']=git('rev-parse','HEAD');facts['source_clean']=not bool(git('status','--porcelain'));save(out/'facts.json',facts)
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],'observation_spec_digest':observation_spec_digest(spec),
         'request_seal_digest':sha256_json(request),'collection_session_id':run,'collector_role':'guihong-objects-collector','coverage':'COMPLETE' if status=='COMPLETED' else 'ERROR',
-        'normalization_semantics_version':'guihong-objects/1.1','facts_digest':sha256_json(facts)}
-    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-objects/1.1','captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
+        'normalization_semantics_version':'guihong-objects/1.2','facts_digest':sha256_json(facts)}
+    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-objects/1.2','captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
     save(out/'evidence.json',evidence)
     report=create_acceptance_bundle(plan=plan,evidence_paths=[out/'evidence.json'],output=out/'bundle',acceptance_id=run,execution_status=status)
     summary={'run_id':run,'source_sha':source,'execution':status,'verdict':report['verdict'],'boundary':facts['boundary'],'bundle':str(out/'bundle')};save(out/'summary.json',summary);print(json.dumps(summary))

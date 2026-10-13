@@ -11,3 +11,9 @@ Broker 单 CPU、512 MiB、128 PID 的预算保持；JVM 显式感知 1 CPU，�
 组件 profile 修订 1.1：第一真实 MQ 运行在 topic 清理处失败，发现 5.5.0 删除路径和 housekeeping 无条件访问 TimerWheel。原先禁用 TimerWheel 的 workaround 不兼容，撤销；原事件、源码和 Plan 保留。实际镜像 jar 的 TimerWheel 固定 604800 slots，对应 38707200 字节；初始化的驻留直接缓冲和 Files.readAllBytes 临时直接缓冲合计已超过 64 MiB。**不提高 512 MiB 容器上限或既有 256 MiB heap+direct 合计预算**，改为 heap 128 MiB / direct 128 MiB（原 192/64），初始 heap 96 MiB；TimerWheel get/put 各 1 线程。全部原始收发、清理和资源条件必须复验；若 heap/总占用/PID 验证失败保留证据并阻断，不继续增加上限。
 
 资源 watchdog 每 5 秒保存全机与各具名应用 RSS；全机连续三次大于 14 GiB、任一应用 RSS 大于 384 MiB 时停止精确 owned 实验，保留数据库、对象卷和库外 witness。各执行窗口最长 3600 秒，可在下一明确窗口继续，不构成计划任务。
+
+组件 profile 修订 1.2：首次逐容器补采显示 Broker 约 313.9 MiB / 512 MiB、121 / 128 PIDs；这是 PID 余量不合格，原 foundation/S3 结果仅保留为部分证据。一次诊断曾关闭 Lite Pull/Lite Event、账户统计、广播 offset 存储及详细统计，空闲态降至 107 PIDs，但真实 MQ 探针先后达到 113 和 117，且 topic 清理返回错误；这些功能开关全部撤销，不能用破坏生命周期换资源资格。保持 512 MiB 与 128 PID 上限，最终有界复验只使用标准 JVM 单核小堆配置：关闭分层编译、一个 JIT compiler thread、Serial GC；经典 Consumer、同步刷盘、TimerWheel、topic 生命周期和三档 Delivery 重试保持。若同一 watchdog 仍失败，结论为环境阻断，不继续关闭 RocketMQ 功能。
+
+同一逐容器门随后在 NameServer 冷启动捕获 181,298,790 bytes，即 172.9 MiB / 192 MiB，内存余量 9.95%，按预封存的 10% 停止线失败。先前把原始 bytes 误按十进制 MB 写成 181.3 MiB，现按二进制 MiB 更正，原始样本和阻断结论不变。保持 192 MiB 容器上限与 32 MiB direct memory，单机路由服务的 heap 从 96 MiB 收束到 64 MiB、初始 heap 32 MiB，并与 Broker 一样固定单编译线程；真实路由注册、MQ 收发与恢复仍须按原条件复验。
+
+组件 profile 修订 1.3：项目所有者确认 128 PID 与 192 MiB 是 M1 实施参数，不是 M0 业务不变量，并授权 [资源合同 1.1](m1-resource-contract-1.1.md)。新版本只把 Broker PID 上限改为 192、NameServer 内存上限改为 256 MiB；14 GiB 宿主机停止线、10% 容器内存余量、16 PID 余量、512 MiB Broker 内存和完整拓扑持续窗口不变。恢复标准 delay levels 与 POP 初始化，不再关闭 RocketMQ 内部功能；原 1.0–1.2 的样本、Plan 和非 PASS 结果不追溯改写。按 1.1 只执行一次全新实验复验，失败即停止调参并进入替代队列评估。

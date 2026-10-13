@@ -52,14 +52,16 @@ def main():
              'image':image,'payload_sha256':expected_hash,'payload_bytes':len(payload),
              'key_prefix':'qualification/'+run,'control':args.control,
              'm1_contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),
+             'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.1.md').read_bytes()),
              'lock_sha256':sha((ROOT/'docs/environment-lock.json').read_bytes())}
-    spec={'id':'s3-observation','contract':{'id':'guihong-s3','version':'1.0'},
+    spec={'id':'s3-observation','contract':{'id':'guihong-s3','version':'1.1'},
           'evidence_type':'guihong.s3','coordinates':request,'projections':['source_sha','container','operations','restart','backend','anonymous','wrong_signature'],
           'canonicalization_profile':'veritrail-json-c14n/1'}
     def hard(name,path,value):
         return {'id':name,'severity':'HARD','left':{'requirement_id':'storage','path':'/facts/'+path},'operator':'eq','right':value}
     assertions=[hard('source','source_sha',source),hard('clean','source_clean',True),
                 hard('contract','m1_contract_sha256',request['m1_contract_sha256']),
+                hard('resource-contract','resource_contract_sha256',request['resource_contract_sha256']),
                 hard('lock','lock_sha256',request['lock_sha256']),hard('pinned-image','container/requested_image',image),
                 hard('image-digest','container/repo_digest',image),hard('loopback-s3','container/mapped_ports',[{'host':'127.0.0.1','port':19833,'target':'8333/tcp'}]),
                 hard('memory-cap','container/memory_limit',256*1024**2),hard('no-oom','container/oom_killed',False),
@@ -79,7 +81,7 @@ def main():
         assertions.append(hard('cross-service-denial-'+str(i),f'cross_service/{i}/http',403))
     for i in range(3):
         assertions.append(hard('backend-unreachable-'+str(i),f'backend/{i}/connect_result', 'UNREACHABLE'))
-    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-s3','version':1,
+    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-s3','version':2,
         'subject':{'id':'guihong-m1-a04','version':source,'source_ref':'github:NoctilumeDev/GuiHongMail'},
         'question':'Does the pinned single-node SeaweedFS satisfy declared actual S3 operations, restart durability and namespace/backend isolation?',
         'governance':{'claim_owner_ref':'human:repository-owner','drafter_ref':'guihong:storage-adapter',
@@ -122,7 +124,9 @@ def main():
             stream.write(json.dumps({'time':datetime.now(timezone.utc).isoformat(),'action':action,'bucket':bucket,'key':key,'result':result},ensure_ascii=False)+'\n');stream.flush();os.fsync(stream.fileno())
         return result
     facts={'source_sha':git('rev-parse','HEAD'),'source_clean':not bool(git('status','--porcelain')),
-           'm1_contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),'lock_sha256':sha((ROOT/'docs/environment-lock.json').read_bytes()),
+           'm1_contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),
+           'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.1.md').read_bytes()),
+           'lock_sha256':sha((ROOT/'docs/environment-lock.json').read_bytes()),
            'operations':[],'cross_service':[],'backend':[],'boundary':'M1_A04_S3_ONLY'}
     status='COMPLETED';error_record=None
     try:
@@ -199,9 +203,9 @@ def main():
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1',
           'plan_digest':plan['seal']['digest'],'observation_spec_digest':observation_spec_digest(spec),
           'request_seal_digest':sha256_json(request),'collection_session_id':run,'collector_role':'guihong-s3-collector',
-          'coverage':'COMPLETE' if status=='COMPLETED' else 'ERROR','normalization_semantics_version':'guihong-s3/1.0','facts_digest':sha256_json(facts)}
+          'coverage':'COMPLETE' if status=='COMPLETED' else 'ERROR','normalization_semantics_version':'guihong-s3/1.1','facts_digest':sha256_json(facts)}
     if args.control=='wrong-binding':metadata['plan_digest']='0'*64
-    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-s3/1.0',
+    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-s3/1.1',
           'captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
     save(out/'evidence.json',evidence)
     report=create_acceptance_bundle(plan=plan,evidence_paths=[] if args.control=='missing-evidence' else [out/'evidence.json'],
