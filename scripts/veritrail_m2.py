@@ -291,12 +291,13 @@ def main():
         'change_scope':{'level':'L2_CONTRACT','owner':'GuiHongMail M2','consumers':['m2-stage-gate']},
         'reproduction_steps':['Start the exact immutable Go build in a fresh owned lab.','Run this collector and inspect the retained browser, API, SQL, S3, restart and resource facts.'],
         'cleanup_steps':['Stop exact owned application PIDs and remove only the owned lab after evidence retention.']})
-    save(out/'sealed-plan.json',plan);status='COMPLETED';error=None
+    save(out/'sealed-plan.json',plan);save(out/'request.json',request);status='COMPLETED';error=None
     try:facts=collect(out)
     except Exception as failure:
         status='ERROR';error={'exception_type':type(failure).__name__,'message':str(failure)};facts={'source_sha':source,'cases':{},'boundary':'M2_MAILBOX_AND_WEB_ONLY'};save(out/'collection-error.json',error)
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],
-              'observation_spec_digest':observation_spec_digest(spec),'collection_session_id':run,'collector_role':'guihong-m2-collector',
+              'observation_spec_digest':observation_spec_digest(spec),'request_seal_digest':sha256_json(request),
+              'collection_session_id':run,'collector_role':'guihong-m2-collector',
               'coverage':'COMPLETE' if status=='COMPLETED' else 'ERROR','normalization_semantics_version':'guihong-m2/1.0','facts_digest':sha256_json(facts)}
     if args.control=='wrong-binding':metadata['plan_digest']='0'*64
     evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-m2/1.0','captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
