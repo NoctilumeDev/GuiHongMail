@@ -1,6 +1,6 @@
 # 邮件事实与 SMTP 可靠性合同 0.1
 
-**M0 draft — NOT IMPLEMENTED**。以 [RFC 5321](https://www.rfc-editor.org/info/rfc5321/)、[RFC 5322](https://www.rfc-editor.org/info/rfc5322/)、[RFC 6409](https://www.rfc-editor.org/info/rfc6409/) 及 MIME 相关 RFC 为行为参照；选择经维护的 SMTP/MIME 实现库，不自造不完整协议解释器。
+**M0 approved — SEAL_PENDING / NOT IMPLEMENTED**。以 [RFC 5321](https://www.rfc-editor.org/info/rfc5321/)、[RFC 5322](https://www.rfc-editor.org/info/rfc5322/)、[RFC 6409](https://www.rfc-editor.org/info/rfc6409/) 及 MIME 相关 RFC 为行为参照；选择经维护的 SMTP/MIME 实现库，不自造不完整协议解释器。
 
 ## 事实拆分
 
@@ -49,3 +49,7 @@
 ## 外部互通资格是另外一项工程
 
 真正向 QQ/Gmail 之类外部系统发信，需要可控域名、MX / SPF / DKIM / DMARC / DNS 反解、TLS、公网路由和服务商策略等额外条件；即使外部 MX 回复 SMTP `250`，仍不能保证落在对方主收件箱。M0–M6 只承诺受控本机/隔离下一跳真实 SMTP 验证，E1 另行批准后再谈公网域名与可送达性。
+
+## 用户批准的默认行为
+
+UNKNOWN 的归属、显式重试与排队取消按[投递合同](delivery-lifecycle.md)；接纳后责任、额度与导入/GC 按[存储合同](storage-lifecycle.md)。只允许全发送范围从未开始任何尝试的原子排队取消，不实现定时/延迟发送或发送后撤回。所有终态及权限判断绑定真实 source/recipient/attempt，不能由 Message-ID 或客户端自报推定。

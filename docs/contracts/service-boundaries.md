@@ -1,6 +1,6 @@
 # 服务边界、持久化与协议交接合同 0.1
 
-**M0 draft — NOT IMPLEMENTED**。仅约束状态主人及通信，不冻结 Java package 名称和接口字段。
+**M0 approved — SEAL_PENDING / NOT IMPLEMENTED**。仅约束状态主人及通信，不冻结 Java package 名称和接口字段。
 
 ## 三个状态所有者
 
@@ -39,7 +39,7 @@ Browser -- authenticated API --> mailbox-service
                      ingress spool GC-eligible
 ```
 
-**不能跨服务的边界：** schema 写、MySQL JOIN、共有业务 Entity、共用 JPA/Mappers、反向同步调用环、无归属的全局 `mail_status`、共享可变 MIME、跨服务使用同一 MinIO Root 密钥。`platform-common` 仅为请求相关 ID、脱敏日志、技术错误模型、契约校验工具，不承载业务状态机。分类算法只在 Mailbox 内经确定性输入/输出合同提供可替换实现，不设第四个微服务。
+**不能跨服务的边界：** schema 写、MySQL JOIN、共有业务 Entity、共用 JPA/Mappers、反向同步调用环、无归属的全局 `mail_status`、共享可变 MIME、跨服务使用同一 SeaweedFS S3 Root 密钥。`platform-common` 仅为请求相关 ID、脱敏日志、技术错误模型、契约校验工具，不承载业务状态机。分类算法只在 Mailbox 内经确定性输入/输出合同提供可替换实现，不设第四个微服务。
 
 ## 原子性与非原子性
 
@@ -55,4 +55,8 @@ Browser -- authenticated API --> mailbox-service
 
 ## 包级分层
 
-每个 Java 服务：`interfaces`（HTTP/SMTP/MQ DTO）→ `application`（用例协调）→ `domain`（规则、不变量、状态机）← `infrastructure`（MySQL/MQ/SMTP/MinIO 实现）。严格防止 domain 直接依赖 Spring、SMTP library、SQL、消息客户端。简单实体不为“纯架构”制造接口；只有跨替换、隔离或合同边界才设端口。
+每个 Java 服务：`interfaces`（HTTP/SMTP/MQ DTO）→ `application`（用例协调）→ `domain`（规则、不变量、状态机）← `infrastructure`（MySQL/MQ/SMTP/SeaweedFS S3 实现）。严格防止 domain 直接依赖 Spring、SMTP library、SQL、消息客户端。简单实体不为“纯架构”制造接口；只有跨替换、隔离或合同边界才设端口。
+
+## 新决定的所有权
+
+Delivery 拥有 DispatchScope 的首次领取/ever_started/取消 tombstone，与 per-recipient jobs 同事务裁决；Mailbox 的取消请求不等于取消成功。Ingress 接纳前的账户/额度准入由 Mailbox 签发，但接受后的责任由 Ingress 持久承担；具名异步确认才使 spool 可清理。跨服务内容经 API/有界能力复制到接收服务的持久空间，各服务凭据不能管理源桶。见[投递](delivery-lifecycle.md)、[存储](storage-lifecycle.md)与[恢复](recovery.md)。

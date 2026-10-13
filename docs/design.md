@@ -1,6 +1,6 @@
 # 归鸿 · 汉唐水墨视觉合同 0.2
 
-**状态：`VISUAL_DIRECTION_ACCEPTED_IN_CONVERSATION / REFERENCE_CANDIDATE / M0_NOT_SEALED`。** 方向来自本轮用户确认；M0 仍等待整体批准。设计参考是审美与结构输入，不是已经可运行的组件或经过真实浏览器验证的界面。M7 最终精修必须等待用户参与。
+**状态：`VISUAL_DIRECTION_ACCEPTED_IN_CONVERSATION / REFERENCE_CANDIDATE / M0_SEAL_PENDING`。** 用户已授权补齐冻结 M0。设计参考是审美与结构输入，不是已经可运行的组件或经过真实浏览器验证的界面。M7 最终精修必须等待用户参与。
 
 ## 一句话定调
 

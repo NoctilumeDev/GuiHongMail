@@ -1,6 +1,6 @@
 # 归鸿独立核验与 VeriTrail 接入边界 0.1
 
-**M0 draft — NO RUN CLAIMS**。
+**M0 approved — SEAL_PENDING / NO RUN CLAIMS**。
 
 参照 [Qixu 验迹接入合同](https://github.com/NoctilumeDev/Qixu/blob/main/docs/verification.md)，本项目先由业务自己确定 SMTP/邮箱不变量，再用项目拥有的 collectors 制作标准 Evidence；Core 只按人事先封存的条件判定充分性。
 
@@ -8,7 +8,7 @@
 
 ## 实际事实的所有权
 
-- Source-run 产物：真实 SMTP transcript（删敏）、原始受控邮件 MIME digest、真实 MySQL 行/锁/回执、MQ 与 MinIO 元信息、容器/进程身份/退出码、浏览器 network/DOM/截屏。
+- Source-run 产物：真实 SMTP transcript（删敏）、原始受控邮件 MIME digest、真实 MySQL 行/锁/回执、MQ 与 SeaweedFS S3 元信息、容器/进程身份/退出码、浏览器 network/DOM/截屏。
 - Producer 只将 source facts 规范化为 Evidence；不准预先写 `mail_delivered=true`、`all_passed=true` 等跨来源复合结论假冒 Core verdict。
 - 每个 Plan 在首次运行前封存 source SHA、工具链、拓扑、环境、最大 payload、目标、受控变量、允许的故障窗口、停止线和必需断言。输出各自 Run ID、Evidence/Bundle/hash 与失败原件。
 - 需要证明跨 Evidence 的身份绑定时，由 Core 的明示 assertion/binding 表达；不允许凭某次采集器都写了同样字符串就当成独立绑定证明。
@@ -32,3 +32,7 @@
 `UI sent toast` < `Mailbox submitted` < `Delivery worker observed next-hop SMTP 250`；即使下一跳是受控接收服务，除非独立阅读源事实，否则不能宣传最终用户已收/已读。SMTP 真实失败/恢复的证据是原始会话、持久事实、重放路径，不是只看日志里出现“success”。浏览器截图只能证明某状态可见，不能单独证明 SMTP 真实执行。
 
 独立复验不应构造一个只复制生产验证器算法的“oracle”；业务预期来自预冻结不变量与独立 SQL/原字节/SMTP transcript。原始失败记录不覆盖，后续 PASS 取得新的版本与身份。
+
+## 必过项与授权绑定
+
+[验收义务](../docs/acceptance-obligations.md)是预先固定的分母，各阶段 Plan 在真实观察前具体化。封存权来自[实际用户授权](authorization.md)，可记录 `human:repository-owner:guihong-m1-m6-20261013`；不伪造逐关人工审批。核心门缺证据不能发布工程资格。业务 UNKNOWN 是合法待核对结果，不等于资格 UNKNOWN。负向探针必须验证错误绑定/摘要/缺证据不被误判为 PASS。公开 Core 0.13.0 wheel 摘要在 M1 独立下载确认，不能以工作树包替代。

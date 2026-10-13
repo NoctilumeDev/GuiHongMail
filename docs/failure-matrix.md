@@ -8,22 +8,24 @@
 | F02 | 同 key/同身份重复提交十次；同 key 改收件人 | 相同意图最多一个业务发送；改正文 409/冲突 | Request receipt+SQL |
 | F03 | SMTP ingress DATA 字节未耐久便尝试回 250 | 必须拒绝；不得接纳“成功后丢信” | Raw SMTP+spool |
 | F04 | spool 已耐久，`250` 回应在链路丢失 | 已接纳邮件可导入；发送方可能重试的风险明确 | SMTP transcript+SQL |
-| F05 | Ingress object 上传成功、DB 事务失败 | 不回 250；orphan object 可归属且有界清理 | MinIO+DB+reaper |
+| F05 | Ingress object 上传成功、DB 事务失败 | 不回 250；orphan object 可归属且有界清理；COMMIT未知不误删 | SeaweedFS S3+DB+reaper |
 | F06 | Ingress 已 250，Mailbox 暂时离线 | spool 不删除、恢复后该账户可见一次逻辑效果 | Spool+import receipt |
 | F07 | 同一事件重复/乱序或 MQ ACK 丢失 | 消费幂等，不漏收件、不因重放覆盖新状态 | MQ+DB+recipient |
 | F08 | Worker A 持有 lease 卡住，B 接管，A 复活 | A 不可过期本地提交；外部 SMTP side effect 不宣称被 fence 消除 | Lease epoch+remote stub |
 | F09 | 远端已接受 `250`，本地记录前崩溃 | `UNKNOWN`/声明的重试策略；不伪称 exactly once | 受控 next-hop + attempt |
 | F10 | 4xx（临时）与 5xx（永久）及 RCPT 部分拒收 | per-recipient 状态独立，有限退避/终止，有真实通知 | 多 RCPT SMTP+DB |
-| F11 | 用户取消/删除与发送/重试并发 | 已外发不能“撤回成功”；草稿/发送意图与 mailbox 删除不混同 | DB+实际 SMTP |
+| F11 | 排队取消与首次领取竞争；取消后重启/重放 | 同一scope持久转换互斥；四个必过见证；已开始不撤回，取消后不重排 | 独立DB+实际SMTP下一跳 |
 | F12 | A 改 B 登录、旧异步请求/附件回包迟到 | B 看不到 A 的内容；旧请求不污染新 UI 或邮箱 | 浏览器双会话+授权 |
 | F13 | To/CC/BCC 多收件与转发 | BCC 对其他人不可见，发送收件集合与消息头独立 | MIME/raw + 两用户 API |
 | F14 | 带危险 HTML/远程追踪像素/附件命名 | 脚本不能执行、不能泄漏会话，远图默认不加载 | 真实浏览器+安全单元 |
 | F15 | MIME 编码、深嵌套、超大附件、header 注入 | 有界拒绝/隔离，内存不爆；原 raw 不静默篡改 | 协议 fuzz + budget |
 | F16 | 搜索索引/投影延迟或失效 | 原消息仍可读；搜索降级/过期显式，不当成真实没邮件 | DB原件/搜索 API |
 | F17 | 账号撤权、SMTP 目标域错或中继请求 | 非授权写/relay 被拒，拒绝无持久业务效果 | SMTP AUTH/权限+SQL |
-| F18 | DB/MQ/MinIO 临时断连和恢复、队列积压 | 不假成功、不无界内存/重试；正常恢复后最终状态可验 | 资源/进程/日志/SQL |
+| F18 | DB/MQ/SeaweedFS S3 临时断连和恢复、队列积压 | 不假成功、不无界内存/重试；正常恢复后最终状态可验 | 资源/进程/日志/SQL |
 | F19 | 快速重启、健康端点提前 READY、关闭时在途 | readiness 准确；drain 保留已接受事实与归属清理 | 启停/网络/数据库 |
-| F20 | 旧数据库快照恢复但外部已接受部分邮件 | 不依据旧库重发且声称一次；保留外部无法回滚的 UNKNOWN/对账条件 | 快照/next-hop 记录 |
+| F20 | 旧数据库快照恢复但外部已接受部分邮件；当前库单独缺账册 | NOT_RECONCILED隔离业务写/投递/重试/导入/Outbox/GC；不自动重发 | 快照/库外见证/next-hop/SQL |
+
+F04/F09 的 UNKNOWN 只影响实际不确定的 attempt/收件人；确定结果保留，显式承认重复风险才产生新尝试。F03/F06/F18 必须覆盖接纳准入/额度与接受后导入责任；通知采用 envelope 与空 reverse-path，避免退信循环。必过集合按[固定义务](acceptance-obligations.md)，未测扩展不混入已有资格。
 
 | F21 | 人工分类与显式规则、算法建议矛盾 | 以人工明确归类为最终选择，建议不能静默改写；规则匹配可解释 | 每账户分类事实/规则版本 |
 | F22 | 分类样本不足、反馈污染、模型升级或账号切换 | 不跨账号训练、UNKNOWN 不自动搬信；关停模型可恢复确定性规则 | 独立小样本 oracle + UI |
