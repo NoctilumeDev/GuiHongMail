@@ -167,7 +167,10 @@ def main():
         gc_retry=call('mailbox','/internal/storage/gc','POST');deleted=list(gc_retry[1]['deleted'])
         for role in ('ingress','delivery'):
             role_gc=call(role,'/internal/storage/gc','POST');deleted.extend(role_gc[1]['deleted'])
-        facts['gc']={'failure_http':gc_failure[0]['http'],'state_after_failure':after_failure['database_state'],'retry_http':gc_retry[0]['http'],'deleted_count':len(deleted),'deleted_ids':deleted}
+        expected_gc_ids={request['object_ids'][name] for name in ('mailbox','ingress','delivery','put_failure','rollback')}
+        own_deleted=[item for item in deleted if item in expected_gc_ids]
+        facts['gc']={'failure_http':gc_failure[0]['http'],'state_after_failure':after_failure['database_state'],'retry_http':gc_retry[0]['http'],
+            'deleted_count':len(own_deleted),'deleted_ids':own_deleted,'other_recovered_count':len(deleted)-len(own_deleted)}
         for role in lab.SERVICES:
             row=db(role,request['object_ids'][role]);facts['positive'][role]['database_state']=row['database_state'];facts['positive'][role]['s3_after_gc']=s3_get(role,row['object_key'])['http']
         for name in ('put_failure','rollback'):

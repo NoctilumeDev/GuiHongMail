@@ -11,6 +11,13 @@ import time
 import uuid
 import lab
 
+def is_commit_query(payload):
+    if len(payload)<2 or payload[0]!=3:return False
+    query=payload[1:]
+    # CLIENT_QUERY_ATTRIBUTES adds zero parameter-count and one parameter-set-count bytes.
+    if query.startswith(b'\x00\x01'):query=query[2:]
+    return query.strip().upper()==b'COMMIT'
+
 class Proxy:
     def __init__(self,port,root):
         self.port=port;self.root=root;self.stop=threading.Event();self.threads=[]
@@ -43,10 +50,11 @@ class Proxy:
                     packet,buffer=buffer[:length+4],buffer[length+4:]
                     payload=packet[4:]
                     armed=(self.root/'arm').is_file()
-                    commit=len(payload)>1 and payload[0]==3 and payload[1:].decode('utf-8','replace').strip().lower()=='commit'
+                    commit=is_commit_query(payload)
                     if armed:
                         self.record('armed-command',{'bytes':len(packet),'sha256':hashlib.sha256(packet).hexdigest(),
-                            'command':payload[0] if payload else None,'payload_prefix_hex':payload[:16].hex(),
+                            'command':payload[0] if payload else None,
+                            'query_attributes_frame':len(payload)>=3 and payload[0]==3 and payload[1:3]==b'\x00\x01',
                             'simple_commit_match':commit})
                     upstream.sendall(packet)
                     if armed and commit:
