@@ -43,7 +43,7 @@ def main():
         'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),'proxy_port':23306,
         'object_ids':{name:str(uuid.uuid4()) for name in ['mailbox','ingress','delivery','put_failure','rollback','unknown']}}
     spec={'id':'objects-observation','contract':{'id':'guihong-objects','version':'1.0'},'evidence_type':'guihong.objects',
-        'coordinates':request,'projections':['source_sha','positive','put_failure','known_rollback','commit_unknown','gc','integrity','journal_recovery'],
+        'coordinates':request,'projections':['source_sha','positive','put_failure','known_rollback','commit_unknown','gc','integrity','journal_recovery','final_cleanup'],
         'canonicalization_profile':'veritrail-json-c14n/1'}
     def hard(id,path,value):return {'id':id,'severity':'HARD','left':{'requirement_id':'objects','path':'/facts/'+path},'operator':'eq','right':value}
     assertions=[hard('source','source_sha',source),hard('clean','source_clean',True),hard('contract','contract_sha256',request['contract_sha256']),hard('component','component_sha256',request['component_sha256'])]
@@ -57,7 +57,9 @@ def main():
         hard('unknown-reconciles','commit_unknown/readiness_restart/http',200),hard('unknown-read','commit_unknown/read_after_restart_sha256',sha(('unknown|'+run+'|归鸿对象').encode())),hard('unknown-gc-protected','commit_unknown/gc_while_referenced',[]),
         hard('gc-failure','gc/failure_http',503),hard('gc-deleting','gc/state_after_failure','DELETING'),hard('gc-retry','gc/retry_http',200),hard('gc-bounded','gc/deleted_count',5),
         hard('corrupt-read','integrity/read_http',503),hard('corrupt-block','integrity/readiness_after/http',503),hard('corrupt-restore','integrity/readiness_restart/http',200),
-        hard('journal-missing','journal_recovery/readiness_missing/http',503),hard('journal-restored','journal_recovery/readiness_restored/http',200)]
+        hard('journal-missing','journal_recovery/readiness_missing/http',503),hard('journal-restored','journal_recovery/readiness_restored/http',200),
+        hard('cleanup-deref','final_cleanup/dereference_http',204),hard('cleanup-gc','final_cleanup/gc_http',200),
+        hard('cleanup-state','final_cleanup/database_state','DELETED'),hard('cleanup-object','final_cleanup/s3_http',404)]
     plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-objects','version':1,
         'subject':{'id':'guihong-m1-a05','version':source,'source_ref':'github:NoctilumeDev/GuiHongMail'},
         'question':'Do standard S3 application writes, refs, native commit ambiguity, bounded GC and recovery fail closed under the declared M1 mechanisms?',
@@ -190,6 +192,10 @@ def main():
         missing=call('mailbox','/health/ready')[0];facts['journal_recovery']={'readiness_missing':missing}
         apps.stop();mailbox_running=False;os.replace(fault_path,journal_path);apps.start();mailbox_running=True
         facts['journal_recovery']['readiness_restored']=call('mailbox','/health/ready')[0]
+        cleanup_deref=dereference('mailbox','unknown');cleanup_gc=call('mailbox','/internal/storage/gc','POST')
+        cleanup_db=db('mailbox',request['object_ids']['unknown'])
+        facts['final_cleanup']={'dereference_http':cleanup_deref[0]['http'],'gc_http':cleanup_gc[0]['http'],**cleanup_db,
+            's3_http':s3_get('mailbox',cleanup_db['object_key'])['http']}
     except Exception as error:
         status='ERROR';save(out/'collection-error.json',{'exception':type(error).__name__,'message':str(error)})
     finally:
