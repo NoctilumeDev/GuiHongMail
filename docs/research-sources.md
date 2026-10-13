@@ -15,5 +15,7 @@
 | [Haraka](https://github.com/haraka/Haraka) | SMTP hooks与queue责任分离，SMTP server不是邮箱存储 | 协议库必须把最终成功回复放在我方耐久接纳之后 |
 | [MinIO官方仓库](https://github.com/minio/minio) | 2026-10-13读回archived=true；网页显示2026-04-25归档、源码分发 | 用户已批准SeaweedFS，不继续沿用旧latest假设 |
 | [SeaweedFS 4.48候选](https://github.com/seaweedfs/seaweedfs/releases/tag/4.48) | 公开release存在；具体验收及镜像摘要待M1 | A04/A05单机S3真实权限、重启、GC与对账 |
+| [Eclipse Angus Mail](https://eclipse-ee4j.github.io/angus-mail/) | 官方页面列出 2.0.5 与 Jakarta Mail 2.1+ 兼容实现 | A06 使用维护中的 MIME 解析实现，不自造邮件语法 |
+| [OWASP Java HTML Sanitizer 20260313.1](https://central.sonatype.com/artifact/com.googlecode.owasp-java-html-sanitizer/owasp-java-html-sanitizer/20260313.1) | Maven Central 发布坐标与安全嵌入用途 | A06/A07 清理不可信 HTML；仍需 CSP 与真实浏览器无外联见证 |
 
 来源链接中 main/master 会变化，进入实际故障用例时重新锁定引用版本/提交/原字节摘要；不从搜索摘要推定已经复现。来自用户私有会话的决定保留在项目授权账册，不复制个人聊天原文到公开资产。

@@ -15,6 +15,7 @@ import lab
 
 JAVA = Path('D:/IDEA/JDK17/bin/java.exe')
 MVN = Path('D:/Maven/apache-maven-3.9.11-bin/apache-maven-3.9.11/bin/mvn.cmd')
+NPM = Path('D:/Node.js/current/npm.cmd')
 PORTS = {'mailbox':18080,'ingress':18081,'delivery':18082}
 MODULES = {'mailbox':'mailbox-service','ingress':'smtp-ingress','delivery':'delivery-worker'}
 PROCESSES = lab.LAB/'applications'
@@ -105,7 +106,7 @@ def repo_file(relative,label):
 def verified_build(source):
     receipt_path=lab.ROOT/'.artifacts/build'/('build-'+source+'.json')
     receipt=json.loads(receipt_path.read_text(encoding='utf-8'))
-    if receipt.get('schema')!='GuiHongBuildReceipt/1.0' or receipt.get('source_sha')!=source or receipt.get('exit_code')!=0:
+    if receipt.get('schema')!='GuiHongBuildReceipt/1.1' or receipt.get('source_sha')!=source or receipt.get('exit_code')!=0:
         raise RuntimeError('Build receipt does not bind the exact source')
     log=repo_file(receipt['log'],'build log')
     if hashlib.sha256(log.read_bytes()).hexdigest()!=receipt['log_sha256']:
@@ -121,6 +122,15 @@ def verified_build(source):
         artifacts[module]={'path':path,'sha256':digest}
     expected={'platform-common',*MODULES.values()}
     if set(artifacts)!=expected:raise RuntimeError('Build receipt artifact set mismatch')
+    if receipt.get('frontend_lock_sha256')!=hashlib.sha256((lab.ROOT/'frontend/web/package-lock.json').read_bytes()).hexdigest():
+        raise RuntimeError('Frontend lock binding mismatch')
+    assets=[]
+    for row in receipt.get('frontend_assets',[]):
+        path=repo_file(row.get('path',''),'frontend asset')
+        if path.stat().st_size!=row.get('bytes') or hashlib.sha256(path.read_bytes()).hexdigest()!=row.get('sha256'):
+            raise RuntimeError('Frontend asset binding mismatch')
+        assets.append(path)
+    if not assets or not any(path.name=='index.html' for path in assets):raise RuntimeError('Frontend build asset set missing')
     return receipt_path,artifacts
 
 def private():return json.loads((lab.LAB/'secrets.json').read_text())
@@ -189,7 +199,11 @@ def build():
     attempt=uuid.uuid4().hex
     target=root/('build-'+sha+'-'+attempt+'.log')
     with target.open('x',encoding='utf-8') as log:
-        p=subprocess.run([str(MVN),'-B','-ntp','-s',str(settings),'-Dmaven.repo.local='+str(lab.ROOT/'.artifacts/m2'),
+        frontend=lab.ROOT/'frontend/web'
+        p=subprocess.run([str(NPM),'ci','--ignore-scripts','--proxy','http://127.0.0.1:7897','--https-proxy','http://127.0.0.1:7897'],cwd=frontend,env=environment(),stdout=log,stderr=subprocess.STDOUT,timeout=300)
+        if not p.returncode:p=subprocess.run([str(NPM),'test'],cwd=frontend,env=environment(),stdout=log,stderr=subprocess.STDOUT,timeout=300)
+        if not p.returncode:p=subprocess.run([str(NPM),'run','build'],cwd=frontend,env=environment(),stdout=log,stderr=subprocess.STDOUT,timeout=300)
+        if not p.returncode:p=subprocess.run([str(MVN),'-B','-ntp','-s',str(settings),'-Dmaven.repo.local='+str(lab.ROOT/'.artifacts/m2'),
             '-f',str(lab.ROOT/'backend/pom.xml'),'-Dguihong.source_sha='+sha,'verify'],cwd=lab.ROOT,env=environment(),stdout=log,stderr=subprocess.STDOUT,timeout=600)
     if p.returncode:raise RuntimeError('Build failed; retained '+str(target))
     artifacts=[]
@@ -198,9 +212,12 @@ def build():
         if not jar.is_file():raise RuntimeError('Build succeeded without expected artifact '+str(jar))
         artifacts.append({'module':module,'path':jar.relative_to(lab.ROOT).as_posix(),
                           'bytes':jar.stat().st_size,'sha256':hashlib.sha256(jar.read_bytes()).hexdigest()})
-    receipt={'schema':'GuiHongBuildReceipt/1.0','source_sha':sha,'attempt_id':attempt,'exit_code':p.returncode,
+    static=lab.ROOT/'backend/mailbox-service/src/main/resources/static'
+    frontend_assets=[{'path':path.relative_to(lab.ROOT).as_posix(),'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()} for path in sorted(static.rglob('*')) if path.is_file()]
+    receipt={'schema':'GuiHongBuildReceipt/1.1','source_sha':sha,'attempt_id':attempt,'exit_code':p.returncode,
              'log':target.relative_to(lab.ROOT).as_posix(),'log_sha256':hashlib.sha256(target.read_bytes()).hexdigest(),
-             'artifacts':artifacts}
+             'frontend_lock_sha256':hashlib.sha256((lab.ROOT/'frontend/web/package-lock.json').read_bytes()).hexdigest(),
+             'frontend_assets':frontend_assets,'artifacts':artifacts}
     lab.write_new(root/('build-'+sha+'.json'),json.dumps(receipt,indent=2,sort_keys=True)+'\n')
     print(json.dumps(receipt))
 

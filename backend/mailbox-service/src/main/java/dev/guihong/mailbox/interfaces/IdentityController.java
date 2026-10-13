@@ -19,6 +19,7 @@ public final class IdentityController {
     private final IdentityService identity;
     public IdentityController(IdentityService identity){this.identity=identity;}
     @Bean public FilterRegistrationBean<SessionFilter> sessions(){var bean=new FilterRegistrationBean<>(new SessionFilter(identity));bean.addUrlPatterns("/api/*");bean.setOrder(1);return bean;}
+    @Bean public FilterRegistrationBean<SecurityHeadersFilter> securityHeaders(){var bean=new FilterRegistrationBean<>(new SecurityHeadersFilter());bean.addUrlPatterns("/*");bean.setOrder(-10);return bean;}
     @PostMapping("/api/auth/login") public ResponseEntity<?> login(@RequestBody Login login,HttpServletRequest request) {
         return session(identity.login(login.address,login.password,request.getRemoteAddr()));
     }

@@ -13,6 +13,8 @@ artifacts/local/
 **/target/
 **/build/
 **/node_modules/
+**/dist/
+backend/mailbox-service/src/main/resources/static/
 **/.venv/
 **/.gradle/
 **/.idea/

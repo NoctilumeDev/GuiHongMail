@@ -16,7 +16,7 @@ public final class SessionFilter extends OncePerRequestFilter {
     private final IdentityService identity;
     public SessionFilter(IdentityService identity){this.identity=identity;}
     protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws IOException,ServletException {
-        response.setHeader("Cache-Control","no-store");response.setHeader("X-Content-Type-Options","nosniff");
+        response.setHeader("Cache-Control","no-store");
         String path=request.getRequestURI();boolean write=!request.getMethod().equals("GET") && !request.getMethod().equals("HEAD");
         if(write && !ORIGIN.equals(request.getHeader("Origin"))){reject(response,403,"ORIGIN_REJECTED");return;}
         if(path.equals("/api/auth/login")){chain.doFilter(request,response);return;}

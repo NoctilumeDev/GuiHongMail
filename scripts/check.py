@@ -123,7 +123,8 @@ def backend():
     if modules != expected:
         errors.append('backend module boundary differs from '+repr(expected))
     for value in ['<java.version>17</java.version>','<aws.version>2.55.15</aws.version>',
-                  '<rocketmq.version>5.5.0</rocketmq.version>']:
+                  '<rocketmq.version>5.5.0</rocketmq.version>','<angus.version>2.0.5</angus.version>',
+                  '<html-sanitizer.version>20260313.1</html-sanitizer.version>']:
         if value not in pom:errors.append('missing backend version lock '+value)
     services = {'mailbox-service':'mailbox','smtp-ingress':'ingress','delivery-worker':'delivery'}
     for module, migration in services.items():
@@ -135,6 +136,27 @@ def backend():
             errors.append(module+' missing independent foundation migration')
     if errors:raise RuntimeError('\n'.join(errors))
     return {'modules':modules,'independent_migrations':len(services),'java_release':17}
+
+def frontend():
+    package=json.loads((ROOT/'frontend/web/package.json').read_text(encoding='utf-8'))
+    lock=json.loads((ROOT/'frontend/web/package-lock.json').read_text(encoding='utf-8'))
+    errors=[]
+    if package.get('dependencies')!={'vue':'3.5.44'}:errors.append('frontend runtime dependency set changed')
+    if lock.get('lockfileVersion')!=3 or lock.get('packages',{}).get('',{}).get('dependencies')!=package.get('dependencies'):
+        errors.append('frontend lock does not bind runtime dependencies')
+    navigation=(ROOT/'frontend/web/src/navigation.ts').read_text(encoding='utf-8')
+    labels=re.findall(r"label: '([^']+)'",navigation)
+    if labels!=['写信','收件箱','已发邮件','草稿箱','归档','垃圾邮件','已删除']:
+        errors.append('frontend navigation differs from frozen seven entries')
+    css=(ROOT/'frontend/web/src/styles.css').read_text(encoding='utf-8')
+    for required in ('.pane {','overflow-y: auto','@media (max-width: 700px)','.left-collapsed','.list-collapsed',
+                     '.mobile-step-folders','.mobile-step-list','.mobile-step-reader'):
+        if required not in css:errors.append('frontend layout contract missing '+required)
+    app=(ROOT/'frontend/web/src/App.vue').read_text(encoding='utf-8')
+    for required in ('sandbox=""','发送（M3 开放）'):
+        if required not in app:errors.append('frontend safety/route contract missing '+required)
+    if errors:raise RuntimeError('\n'.join(errors))
+    return {'runtime_dependencies':package['dependencies'],'lockfile_version':3,'navigation_entries':labels,'independent_scroll_regions':3}
 
 def architecture():
     errors=[]
@@ -195,10 +217,10 @@ def security():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('gate',choices=['docs','seal','backend','architecture','security','hygiene','all'])
+    parser.add_argument('gate',choices=['docs','seal','backend','frontend','architecture','security','hygiene','all'])
     args = parser.parse_args()
-    gates = {'docs':docs,'seal':make_seal,'backend':backend,'architecture':architecture,'security':security,'hygiene':hygiene}
-    selected = ['docs','backend','architecture','security','hygiene'] if args.gate=='all' else [args.gate]
+    gates = {'docs':docs,'seal':make_seal,'backend':backend,'frontend':frontend,'architecture':architecture,'security':security,'hygiene':hygiene}
+    selected = ['docs','backend','frontend','architecture','security','hygiene'] if args.gate=='all' else [args.gate]
     print(json.dumps({key:gates[key]() for key in selected}, ensure_ascii=False,indent=2))
 
 if __name__ == '__main__':

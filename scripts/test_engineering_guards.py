@@ -78,11 +78,19 @@ class BuildReceiptTest(unittest.TestCase):
                 jar=root/'backend'/module/'target'/(module+'-0.1.0-SNAPSHOT.jar');jar.parent.mkdir(parents=True);jar.write_bytes(module.encode())
                 rows.append({'module':module,'path':jar.relative_to(root).as_posix(),'bytes':jar.stat().st_size,
                              'sha256':hashlib.sha256(jar.read_bytes()).hexdigest()})
-            receipt={'schema':'GuiHongBuildReceipt/1.0','source_sha':'source','exit_code':0,
-                     'log':log.relative_to(root).as_posix(),'log_sha256':hashlib.sha256(log.read_bytes()).hexdigest(),'artifacts':rows}
+            lock=root/'frontend/web/package-lock.json';lock.parent.mkdir(parents=True);lock.write_bytes(b'lock')
+            index=root/'backend/mailbox-service/src/main/resources/static/index.html';index.parent.mkdir(parents=True);index.write_bytes(b'index')
+            assets=[{'path':index.relative_to(root).as_posix(),'bytes':index.stat().st_size,
+                     'sha256':hashlib.sha256(index.read_bytes()).hexdigest()}]
+            receipt={'schema':'GuiHongBuildReceipt/1.1','source_sha':'source','exit_code':0,
+                     'log':log.relative_to(root).as_posix(),'log_sha256':hashlib.sha256(log.read_bytes()).hexdigest(),
+                     'frontend_lock_sha256':hashlib.sha256(lock.read_bytes()).hexdigest(),'frontend_assets':assets,'artifacts':rows}
             receipt_path=build/'build-source.json';receipt_path.write_text(json.dumps(receipt))
             with patch.object(apps.lab,'ROOT',root):
                 _,verified=apps.verified_build('source');self.assertEqual(4,len(verified))
+                index.write_bytes(b'tampered')
+                with self.assertRaisesRegex(RuntimeError,'Frontend asset binding mismatch'):apps.verified_build('source')
+                index.write_bytes(b'index')
                 receipt['log']=str(Path(directory).parent/'outside.log');receipt_path.write_text(json.dumps(receipt))
                 with self.assertRaisesRegex(RuntimeError,'Unsafe build log path'):apps.verified_build('source')
 
