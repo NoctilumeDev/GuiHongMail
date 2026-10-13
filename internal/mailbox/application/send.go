@@ -84,7 +84,14 @@ func (s *Sender) Submit(ctx context.Context, account, draftID string, version in
 		}
 	}
 	intentID, scopeID, contentID := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	raw, err := buildMIME(intentID, sender, draft, files)
+	replyReference := ""
+	if draft.SourceContentID != nil && (draft.Mode == domain.Reply || draft.Mode == domain.ReplyAll) {
+		replyReference, err = s.mailbox.ReplyReference(ctx, account, *draft.SourceContentID)
+		if err != nil {
+			return domain.SendIntent{}, err
+		}
+	}
+	raw, err := buildMIME(intentID, sender, draft, files, replyReference)
 	if err != nil || len(raw) > maxMailboxBytes {
 		return domain.SendIntent{}, &domain.InvalidError{Code: "MIME_SIZE_EXCEEDED"}
 	}
@@ -168,7 +175,7 @@ func (s *Sender) Raw(ctx context.Context, id string) ([]byte, string, error) {
 	return data, digest, nil
 }
 
-func buildMIME(intent, sender string, draft domain.Draft, files [][]byte) ([]byte, error) {
+func buildMIME(intent, sender string, draft domain.Draft, files [][]byte, replyReference string) ([]byte, error) {
 	var output bytes.Buffer
 	writeHeader := func(name, value string) { fmt.Fprintf(&output, "%s: %s\r\n", name, value) }
 	writeHeader("From", sender)
@@ -181,6 +188,10 @@ func buildMIME(intent, sender string, draft domain.Draft, files [][]byte) ([]byt
 	writeHeader("Subject", mime.QEncoding.Encode("UTF-8", draft.Subject))
 	writeHeader("Date", time.Now().UTC().Format(time.RFC1123Z))
 	writeHeader("Message-ID", "<"+intent+"@guihong.test>")
+	if replyReference != "" {
+		writeHeader("In-Reply-To", replyReference)
+		writeHeader("References", replyReference)
+	}
 	writeHeader("MIME-Version", "1.0")
 	mixed := multipart.NewWriter(&output)
 	writeHeader("Content-Type", `multipart/mixed; boundary="`+mixed.Boundary()+`"`)

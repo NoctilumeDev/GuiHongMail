@@ -186,6 +186,7 @@ type Page[T any] struct {
 type MailboxRepository interface {
 	Available(context.Context) bool
 	AccountAddress(context.Context, string) (string, error)
+	ReplyReference(context.Context, string, string) (string, error)
 	ImportMessage(context.Context, ImportedMessage, []Member) error
 	FolderCounts(context.Context, string) ([]FolderCount, error)
 	List(context.Context, string, *Folder, *string, string, int, string) (Page[MessageSummary], error)
