@@ -80,7 +80,8 @@ def assert_owned():
                 info=json.loads(inspected.stdout)[0]
                 if (info.get('Labels') or {}).get('guihong.owner')!=state['id']:
                     raise RuntimeError('Exact-name collision with unowned '+kind)
-            elif 'No such' not in inspected.stderr and 'not found' not in inspected.stderr:
+            elif ('no such volume' not in inspected.stderr.lower() if kind=='volume'
+                  else re.search(r'network .* not found',inspected.stderr.lower()) is None):
                 raise RuntimeError('Cannot establish ownership before mutation')
     return ids
 
