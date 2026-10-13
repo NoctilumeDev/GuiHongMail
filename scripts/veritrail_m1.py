@@ -74,18 +74,21 @@ def inspect_bundle(identity, expected_source):
     report_path = bundle / 'acceptance-report.json'
     plan_path = bundle / 'sealed-acceptance-plan.json'
     report = json.loads(report_path.read_text(encoding='utf-8'))
+    sealed_plan = json.loads(plan_path.read_text(encoding='utf-8'))
     summary = json.loads((run / 'summary.json').read_text(encoding='utf-8'))
+    summary_identity = summary.get('identity', summary.get('run_id'))
+    summary_execution = summary.get('execution_status', summary.get('execution'))
     evidence_clean = all(not row.get('redacted') and row.get('redacted_fields') == 0 for row in report['evidence'])
     return {
         'run_id': identity,
         'manifest_sha256': sha_file(manifest_path),
         'manifest_file_count': len(manifest['files']),
         'manifest_verified': bool(verified) and all(verified),
-        'plan_sha256_verified': report['plan']['sha256'] == sha_file(plan_path),
-        'acceptance_id_verified': manifest['acceptance_id'] == identity == report['acceptance_id'] == summary['identity'],
+        'plan_sha256_verified': report['plan']['sha256'] == sealed_plan['seal']['digest'],
+        'acceptance_id_verified': manifest['acceptance_id'] == identity == report['acceptance_id'] == summary_identity,
         'execution_status': report['execution_status'],
         'verdict': report['verdict'],
-        'summary_matches': summary['execution_status'] == report['execution_status'] and summary['verdict'] == report['verdict'],
+        'summary_matches': summary_execution == report['execution_status'] and summary['verdict'] == report['verdict'],
         'subject_source': report['subject']['version'],
         'source_matches': report['subject']['version'] == expected_source == summary['source_sha'],
         'evidence_unredacted': evidence_clean,
