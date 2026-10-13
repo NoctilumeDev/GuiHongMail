@@ -54,7 +54,7 @@ def main():
     assertions += [hard('put-failed-http','put_failure/http',503),hard('put-failed-orphan','put_failure/database_state','ORPHAN'),hard('put-failed-no-object','put_failure/s3_http',404),
         hard('rollback-http','known_rollback/http',503),hard('rollback-orphan','known_rollback/database_state','ORPHAN'),hard('rollback-object-retained','known_rollback/s3_http',200),hard('rollback-zero-ref','known_rollback/ref_count',0),
         hard('unknown-http','commit_unknown/http',503),hard('unknown-journal','commit_unknown/journal_outcome','U'),hard('unknown-db-object','commit_unknown/database_state','LIVE'),hard('unknown-db-ref','commit_unknown/ref_count',1),hard('unknown-s3','commit_unknown/s3_http',200),hard('unknown-blocks','commit_unknown/readiness_after/http',503),
-        hard('unknown-reconciles','commit_unknown/readiness_restart/http',200),hard('unknown-read','commit_unknown/read_after_restart_sha256',sha(('unknown|'+run+'|归鸿对象').encode())),hard('unknown-gc-protected','commit_unknown/gc_while_referenced',[]),
+        hard('unknown-reconciles','commit_unknown/readiness_restart/http',200),hard('unknown-read','commit_unknown/read_after_restart_sha256',sha(('unknown|'+run+'|归鸿对象').encode())),hard('unknown-gc-protected','commit_unknown/current_object_protected',True),
         hard('gc-failure','gc/failure_http',503),hard('gc-deleting','gc/state_after_failure','DELETING'),hard('gc-retry','gc/retry_http',200),hard('gc-bounded','gc/deleted_count',5),
         hard('corrupt-read','integrity/read_http',503),hard('corrupt-block','integrity/readiness_after/http',503),hard('corrupt-restore','integrity/readiness_restart/http',200),
         hard('journal-missing','journal_recovery/readiness_missing/http',503),hard('journal-restored','journal_recovery/readiness_restored/http',200),
@@ -156,7 +156,9 @@ def main():
         apps.start();mailbox_running=True
         facts['commit_unknown']['readiness_restart']=call('mailbox','/health/ready')[0]
         read=call('mailbox',f"/internal/storage/objects/{request['object_ids']['unknown']}");save_bytes(out/'unknown-application-read.body',read[2]);facts['commit_unknown']['read_after_restart_sha256']=read[0]['sha256']
-        facts['commit_unknown']['gc_while_referenced']=call('mailbox','/internal/storage/gc','POST')[1]['deleted']
+        protected_gc=call('mailbox','/internal/storage/gc','POST')[1]['deleted']
+        facts['commit_unknown']['current_object_protected']=request['object_ids']['unknown'] not in protected_gc
+        facts['commit_unknown']['other_recovered_count']=len(protected_gc)
         # Wait for the approved grace without blocking status communication from the caller.
         grace_deadline=time.monotonic()+62
         while time.monotonic()<grace_deadline:
