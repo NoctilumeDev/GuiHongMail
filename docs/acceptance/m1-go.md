@@ -26,4 +26,22 @@ Go 候选 `66277da54ede3fbc3ee96b3dbb631363e496b846` 于 `2026-10-13T15:08:35.44
 
 ## exact-main
 
-尚未取得。此节只有在受保护合入后，以新的 fresh lab、精确 `origin/main`、新的三个子门和 `--mode exact-main` 聚合闭合后才能升级。
+[PR #6](https://github.com/NoctilumeDev/GuiHongMail/pull/6) 的静态合同、Go 后端与 Web 三项检查通过后，于 `2026-10-13T15:17:42Z` 受保护合入 merge SHA `2a1dd5ae86ed01655cc723ae2d94176e8cdf4054`。旧保护规则仍要求已删除的 `Java 17 backend` 检查名，合入前只把该 context 替换为实际运行的 `Go backend`，保留 strict、静态合同和其余保护。main CI `38420821072` 随后成功。
+
+fresh lab `guihong-local-a11c04ab0907` 第一次启动前因空闲内存 `2.63 GiB` 低于 4 GiB 准入线停止，没有创建容器或卷。人工释放资源后空闲内存为 `4.55 GiB`，同一未污染 lab 才获准启动；三个 schema 均为 virgin，并生成新的对象卷、MQ 卷、凭据和 witness。
+
+exact-main 聚合 `guihong-m1-7806c25444504efcaafa887c5ff33113` 于 `2026-10-13T20:22:47.7965929Z` 得到 `COMPLETED / PASS`，边界 `M1_LOCAL_EXACT_MAIN_ONLY`，并实际断言 `HEAD == origin/main`。Plan 摘要 `f4a998075c7efab3c16d4d4a4df9dfaba3dee3f9cadc283f04cef6ae708723ba`，事实摘要 `e1da67fc63844d32ca4870ad798030624d73697e7e3a26e23a6a7f82db063269`，请求摘要 `a7f89bf1c24f4db015ffcdeb037523d6bf6498df68c524952345258f90afc2ad`，构建回执摘要 `9514e49b82feb4fcd2d4b606ba54689e3419cbbb16fed8283adc7c8c01b28b25`。聚合 bundle manifest SHA-256 为 `d2735dd46b86cdb418a63c5af5bf4a3676ec8ce1c315ad0cdae4b7d7404c5ab8`，80 条规则全部 PASS。
+
+| 子门 | 身份 | Bundle manifest SHA-256 | 结果 |
+| --- | --- | --- | --- |
+| foundation / identity / SMTP / MQ | `guihong-foundation-23ae0cc3fc4d4a08ad45e2b765c5af14` | `001c3dc5f3d4b6d6be09fe4807a6c6d62e14ff9ad4ef03f1a038cdcad8859a8d` | `COMPLETED / PASS` |
+| SeaweedFS A04 | `guihong-s3-43ee35455e2848079302db80e28e7a7e` | `ec71517e9e1f947319873f022672932288a4f22afd67f1a7c5a16156cd37cf75` | `COMPLETED / PASS` |
+| 对象 / GC / 恢复 A05 | `guihong-objects-b197e587fb5f4fb98543936a0a0a9f2b` | `4f1adf280ce91c886b16cd1e9a9d0cdd62116f6701a7e8b6540b7d2c904de7d4` | `COMPLETED / PASS` |
+
+三个资源窗口分别为 21、9、33 个样本，停止原因均为空并覆盖子证据。最长完整拓扑连续 14 个样本；宿主峰值 `13,743,710,208 bytes`，单个 Go 应用 RSS 峰值 `54,546,432 bytes`。Broker 峰值 `374,236,774 / 536,870,912 bytes`、`139 / 192 PIDs`，最小 PID 余量 53；NameServer 峰值 `161,690,419 / 268,435,456 bytes`、70 / 128 PIDs；所有容器 OOM 均为 false。
+
+exact-main 负控 `guihong-m1-48a95c5b8c1d457f842ae467c77f5a6f`、`guihong-m1-241d276982104e4ca326cc4790c0c67a`、`guihong-m1-3f42d0d131fe4521a1eb8e46205f9442` 分别得到预期的 `FAIL`、`INCONCLUSIVE`、`PENDING`。应用已停止，owned 容器、网络和三个数据卷已精确清理；resource/witness 与标准证据移入 qualified-labs 归档。
+
+## 资格结论
+
+Go M1 在 `2a1dd5ae86ed01655cc723ae2d94176e8cdf4054` 取得 `QUALIFIED`：PR/保护门、main CI、fresh exact-main 构建、三个子门、资源窗口、聚合、负控与 owned 清理闭合。Java `51fe46533cc45d7ef5d010db6803165de0780905` 的历史 M1 资格与 `baseline/java-m2-candidate-20261013` 仍保留为对照，不向 Go 继承 M2 结论。下一阶段为 Go M2。
