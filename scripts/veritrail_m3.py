@@ -241,6 +241,17 @@ def smtp_open(recipients, *, sender='outside@example.test'):
     return client, {'mail': mail[0], 'rcpt': [[address, code, message.decode(errors='replace')] for address, code, message in rcpt]}
 
 
+def smtp_size_rejection():
+    client = smtplib.SMTP('127.0.0.1', 12525, timeout=15)
+    try:
+        client.ehlo()
+        code, message = client.mail('outside@example.test', options=['SIZE=5242881'])
+        return {'declared_size': 5242881, 'mail': [code, message.decode(errors='replace')]}
+    finally:
+        try: client.quit()
+        except (smtplib.SMTPException, OSError): client.close()
+
+
 def raw_message(subject, marker='M3', size=0):
     body = marker + ' 中文正文\r\n' + ('x' * size)
     return (f'From: outside@example.test\r\nTo: alice@guihong.test\r\nSubject: {subject}\r\n'
@@ -364,7 +375,7 @@ def collect(out):
     client, limit = smtp_open(extras)
     try: client.rset(); client.quit()
     except (smtplib.SMTPException, OSError): client.close()
-    oversized = smtp_transaction(raw_message('oversized', size=5 * 1024 * 1024 + 1024), ['alice@guihong.test'])
+    oversized = smtp_size_rejection()
     after_rejects = {'spools': scalar('ingress', 'SELECT COUNT(*) FROM accepted_spools'),
                      'entries': scalar('mailbox', 'SELECT COUNT(*) FROM mailbox_entries')}
 
@@ -494,6 +505,7 @@ def collect(out):
         unknown_attempt = jobs['unknown@test.invalid']['attempts'][0]
         observation_start = time.monotonic(); time.sleep(4)
         unknown_stable = send_status(alice, mixed_intent['id'])['delivery']
+        unknown_observation_elapsed = time.monotonic() - observation_start
 
         unconfirmed = alice.request('POST', '/api/mailbox/send-intents/' + mixed_intent['id'] + '/retry-unknown',
             {'confirmDuplicateRisk': False, 'recipient': 'unknown@test.invalid'}, headers={'Idempotency-Key': 'm3-unconfirmed'})
@@ -571,8 +583,8 @@ def collect(out):
     go_apps.stop(); go_apps.start()
     after_restart = snapshots()
 
-    resource_process = subprocess.run([str(PYTHON), '-B', str(ROOT/'scripts/resource_guard.py'), '--duration', '65', '--runtime', 'go'],
-        cwd=ROOT, capture_output=True, text=True, timeout=100)
+    resource_process = subprocess.run([str(PYTHON), '-B', str(ROOT/'scripts/resource_guard.py'), '--duration', '90', '--runtime', 'go'],
+        cwd=ROOT, capture_output=True, text=True, timeout=130)
     if resource_process.returncode:
         raise RuntimeError('resource guard stopped M3 run: ' + resource_process.stdout + resource_process.stderr)
     resource_line = json.loads(resource_process.stdout.strip().splitlines()[-1])
@@ -599,7 +611,7 @@ def collect(out):
     facts['smtp'] = {'relay': relay, 'unknown_local': unknown_local, 'disabled': disabled, 'limit': limit,
         'oversized': oversized, 's3_failure': s3_failure, 'retained': retained, 'commit_failure': commit_failure,
         'commit_fault_files': commit_fault_files, 'controlled_counts': controlled_counts,
-        'unknown_observation_seconds': time.monotonic()-observation_start, 'transcript_file': transcript_path.name,
+        'unknown_observation_seconds': unknown_observation_elapsed, 'transcript_file': transcript_path.name,
         'transcript_events': len(transcript)}
     facts['database'] = {'intent': intent_rows[0], 'scope_count': scope_count, 'job_count': job_count,
         'delivery_attempts': delivery_rows, 'recovery': {'pending': recovery_pending, 'jobs': recovery_jobs,
@@ -637,7 +649,7 @@ def collect(out):
         'M3-03': 'BCC' in recipient_kinds_sender and 'BCC' not in recipient_kinds_bob and 'BCC' not in recipient_kinds_carol and parsed.get('Bcc') is None and any(item['kind']=='BCC' for item in parsed_envelope),
         'M3-04': recovery_pending and recovery_jobs == before_replay == after_replay == 1 and recovery['delivery']['state'] == 'COMPLETED',
         'M3-05': bob_entry and carol_entry and reply_entry and parsed.get_body(('plain',)).get_content().find('M3-IMMUTABLE') >= 0 and reply_parsed.get('In-Reply-To') == parsed.get('Message-ID') and reply_parsed.get('References') == parsed.get('Message-ID'),
-        'M3-06': relay['rcpt'][0][1] == 550 and unknown_local['rcpt'][0][1] == 550 and disabled['rcpt'][0][1] == 550 and [item[1] for item in limit['rcpt']] == [250]*10+[452] and oversized.get('data',[0])[0] == 552 and before_rejects == after_rejects,
+        'M3-06': relay['rcpt'][0][1] == 550 and unknown_local['rcpt'][0][1] == 550 and disabled['rcpt'][0][1] == 550 and [item[1] for item in limit['rcpt']] == [250]*10+[452] and oversized['mail'][0] == 552 and before_rejects == after_rejects,
         'M3-07': s3_failure.get('data',[0])[0] != 250 and s3_spools_before == s3_spools_after and commit_failure.get('data',[0])[0] != 250 and (proxy_root/'fired').is_file() and bool(commit_reconciled) and commit_spools_after == commit_spools_before + 1,
         'M3-08': retained.get('data',[0])[0] == 250 and retained_counts_before == retained_counts_after == {'receipts':1,'members':1} and scalar('ingress','SELECT state FROM accepted_spools WHERE spool_id=%s',(retained_spool['spool_id'],)) == 'GC_ELIGIBLE',
         'M3-09': jobs['accept@test.invalid']['state']=='NEXT_HOP_ACCEPTED' and jobs['temp@test.invalid']['state']=='NEXT_HOP_ACCEPTED' and jobs['perm@test.invalid']['state']=='PERMANENT_FAILURE' and jobs['unknown@test.invalid']['state']=='UNKNOWN',

@@ -186,10 +186,7 @@ func RunDurableSMTP(ctx context.Context, runtime *platform.Runtime) error {
 	server := smtp.NewServer(&durableBackend{runtime: runtime, slots: make(chan struct{}, 2)})
 	server.Domain = "guihong.test"
 	server.MaxRecipients = 10
-	// durableSession.Data owns the exact 5 MiB limit. Leaving the library
-	// reader unlimited lets it drain the DATA terminator and return our 552
-	// instead of aborting a client that is still writing the oversized body.
-	server.MaxMessageBytes = 0
+	server.MaxMessageBytes = 5 * 1024 * 1024
 	server.ReadTimeout = 10 * time.Second
 	server.WriteTimeout = 10 * time.Second
 	errorsChannel := make(chan error, 2)
