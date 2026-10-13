@@ -106,6 +106,10 @@ def build():
                                     stdout=output, stderr=subprocess.STDOUT, timeout=300)
             if result.returncode:
                 raise RuntimeError('Frontend build gate failed; retained ' + str(log_path))
+        result = subprocess.run([str(GO), 'mod', 'download'], cwd=lab.ROOT, env=environment(network=True),
+                                stdout=output, stderr=subprocess.STDOUT, timeout=300)
+        if result.returncode:
+            raise RuntimeError('Go dependency fetch failed; retained ' + str(log_path))
         for command in (['test', './...'], ['vet', './...']):
             result = subprocess.run([str(GO), *command], cwd=lab.ROOT, env=environment(),
                                     stdout=output, stderr=subprocess.STDOUT, timeout=300)
