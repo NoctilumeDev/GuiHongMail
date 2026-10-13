@@ -213,7 +213,7 @@ def mq_send(payload, key, out):
 
 
 def smtp_transaction(raw, recipients, *, sender='outside@example.test', port=12525):
-    result = {'mail': None, 'rcpt': [], 'data': None, 'exception': None}
+    result = {'mail': None, 'rcpt': [], 'exception': None}
     client = smtplib.SMTP('127.0.0.1', port, timeout=15)
     try:
         client.ehlo()
