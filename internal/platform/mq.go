@@ -3,6 +3,7 @@ package platform
 import (
 	"context"
 	"fmt"
+	"time"
 
 	rocketmq "github.com/apache/rocketmq-client-go/v2"
 	"github.com/apache/rocketmq-client-go/v2/admin"
@@ -59,14 +60,34 @@ func EnsureTopic(ctx context.Context, runtime *Runtime, topic string) error {
 		if readErr != nil {
 			return err
 		}
+		found := false
 		for _, existing := range topics.TopicList {
 			if existing == topic {
-				return nil
+				found = true
+				break
 			}
 		}
-		return err
+		if !found {
+			return err
+		}
 	}
-	return nil
+	var lastErr error
+	for {
+		queues, routeErr := api.FetchPublishMessageQueues(ctx, topic)
+		if routeErr == nil && len(queues) > 0 {
+			return nil
+		}
+		if routeErr != nil {
+			lastErr = routeErr
+		} else {
+			lastErr = fmt.Errorf("no publish queue returned")
+		}
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("topic %s route did not become visible: %w (last route error: %v)", topic, ctx.Err(), lastErr)
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }
 
 func Consume(ctx context.Context, runtime *Runtime, group, topic string, handle func(context.Context, string, []byte) error) error {
