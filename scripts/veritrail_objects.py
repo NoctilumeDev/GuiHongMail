@@ -103,6 +103,8 @@ def main():
     def stage(role,name,payload):return call(role,'/internal/storage/objects','POST',{'objectId':request['object_ids'][name],'authority':'qualification:'+run,'base64':base64.b64encode(payload).decode()})
     def reference(role,name,kind='qualification'):return call(role,f"/internal/storage/objects/{request['object_ids'][name]}/references",'POST',{'kind':kind,'referenceId':run})
     def dereference(role,name):return call(role,f"/internal/storage/objects/{request['object_ids'][name]}/references",'DELETE',{'kind':'qualification','referenceId':run})
+    def require_http(label,result,expected):
+        if result[0]['http']!=expected:raise RuntimeError(f'{label} returned HTTP {result[0]["http"]}, expected {expected}')
     facts={'source_sha':source,'source_clean':True,'contract_sha256':request['contract_sha256'],'component_sha256':request['component_sha256'],'boundary':'M1_A05_OBJECTS_RECOVERY'}
     status='COMPLETED';proxy=None;mailbox_running=False
     try:
@@ -118,9 +120,11 @@ def main():
         facts['positive']={}
         for role in lab.SERVICES:
             payload=(role+'|'+run+'|归鸿对象').encode();name=role
-            staged=stage(role,name,payload);referenced=reference(role,name);read=call(role,f"/internal/storage/objects/{request['object_ids'][name]}")
+            staged=stage(role,name,payload);require_http(role+' positive stage',staged,200)
+            referenced=reference(role,name);require_http(role+' positive reference',referenced,200)
+            read=call(role,f"/internal/storage/objects/{request['object_ids'][name]}");require_http(role+' positive read',read,200)
             save_bytes(out/(role+'-application-read.body'),read[2])
-            deref=dereference(role,name)
+            deref=dereference(role,name);require_http(role+' positive dereference',deref,204)
             facts['positive'][role]={'stage_http':staged[0]['http'],'reference_http':referenced[0]['http'],'read_http':read[0]['http'],'read_sha256':read[0]['sha256'],'dereference_http':deref[0]['http'],**db(role,request['object_ids'][name])}
         # Prove a PUT connection refusal never creates an object and becomes a known orphan.
         lab.compose(['stop','--timeout','20','seaweedfs'],capture=True);wait_port(19833,False)
@@ -131,13 +135,14 @@ def main():
             ready=call('mailbox','/health/ready')[0]
             if ready['http']==200:break
             time.sleep(.5)
+        if ready['http']!=200:raise RuntimeError('Mailbox did not reconcile after SeaweedFS restart')
         put_db=db('mailbox',request['object_ids']['put_failure']);facts['put_failure']={'http':put_result[0]['http'],**put_db,**{'s3_http':s3_get('mailbox',put_db['object_key'])['http']}}
         # A deterministic SQL constraint error occurs only after successful PUT and GET/hash.
-        rollback_payload=('rollback|'+run+'|归鸿对象').encode();stage('mailbox','rollback',rollback_payload)
+        rollback_payload=('rollback|'+run+'|归鸿对象').encode();require_http('rollback stage',stage('mailbox','rollback',rollback_payload),200)
         rollback=reference('mailbox','rollback','x'*40);rollback_db=db('mailbox',request['object_ids']['rollback']);rollback_s3=s3_get('mailbox',rollback_db['object_key'],out/'rollback-retained.body')
         facts['known_rollback']={'http':rollback[0]['http'],**rollback_db,'s3_http':rollback_s3['http'],'s3_sha256':rollback_s3.get('sha256')}
         # Forward COMMIT upstream, close only the downstream response, then read DB and S3 independently.
-        unknown_payload=('unknown|'+run+'|归鸿对象').encode();stage('mailbox','unknown',unknown_payload);lab.write_new(proxy_root/'arm','drop exactly one COMMIT response\n')
+        unknown_payload=('unknown|'+run+'|归鸿对象').encode();require_http('commit-unknown stage',stage('mailbox','unknown',unknown_payload),200);lab.write_new(proxy_root/'arm','drop exactly one COMMIT response\n')
         unknown_call=reference('mailbox','unknown');unknown_db=db('mailbox',request['object_ids']['unknown']);unknown_s3=s3_get('mailbox',unknown_db['object_key'],out/'unknown-retained.body')
         journal=(lab.LAB/'witness/mailbox/transactions.log').read_text(encoding='utf-8').splitlines();outcome=journal[-1].split('|')[2]
         readiness_after=call('mailbox','/health/ready')[0]
@@ -164,7 +169,8 @@ def main():
         for role in lab.SERVICES:
             row=db(role,request['object_ids'][role]);facts['positive'][role]['database_state']=row['database_state'];facts['positive'][role]['s3_after_gc']=s3_get(role,row['object_key'])['http']
         for name in ('put_failure','rollback'):
-            row=db('mailbox',request['object_ids'][name]);facts[name]['database_state_after_gc']=row['database_state'];facts[name]['s3_after_gc']=s3_get('mailbox',row['object_key'])['http']
+            fact_name='known_rollback' if name=='rollback' else name
+            row=db('mailbox',request['object_ids'][name]);facts[fact_name]['database_state_after_gc']=row['database_state'];facts[fact_name]['s3_after_gc']=s3_get('mailbox',row['object_key'])['http']
         # Missing referenced bytes block reads/GC until exact bytes are restored and startup reconciles.
         s3('mailbox').delete_object(Bucket=credentials['storage']['mailbox']['bucket'],Key=unknown_db['object_key'])
         corrupt=call('mailbox',f"/internal/storage/objects/{request['object_ids']['unknown']}");corrupt_ready=call('mailbox','/health/ready')[0]

@@ -6,6 +6,8 @@ import java.time.Duration;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.checksums.RequestChecksumCalculation;
+import software.amazon.awssdk.core.checksums.ResponseChecksumValidation;
 import software.amazon.awssdk.core.retry.RetryPolicy;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
@@ -24,6 +26,8 @@ public final class S3ObjectStore implements ObjectStore {
         if (!uri.getHost().equals("127.0.0.1") || !uri.getScheme().equals("http")) throw new IllegalArgumentException("Approved profile requires loopback S3");
         this.bucket = bucket;
         client = S3Client.builder().endpointOverride(uri).region(Region.US_EAST_1).forcePathStyle(true)
+                .requestChecksumCalculation(RequestChecksumCalculation.WHEN_REQUIRED)
+                .responseChecksumValidation(ResponseChecksumValidation.WHEN_REQUIRED)
                 .credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(key, secret)))
                 .httpClientBuilder(UrlConnectionHttpClient.builder().connectionTimeout(Duration.ofSeconds(3)).socketTimeout(Duration.ofSeconds(10)))
                 .overrideConfiguration(c -> c.apiCallTimeout(Duration.ofSeconds(10)).apiCallAttemptTimeout(Duration.ofSeconds(8)).retryPolicy(RetryPolicy.none()))

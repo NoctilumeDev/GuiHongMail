@@ -1,12 +1,15 @@
 package dev.guihong.platform;
 import java.util.Base64;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 /** Authenticated lab commands; public user APIs never accept arbitrary object coordinates. */
 @RestController
 public final class BlobController {
+    private static final Logger LOG=LoggerFactory.getLogger(BlobController.class);
     public record Stage(String objectId,String authority,String base64) {}
     public record Reference(String kind,String referenceId) {}
     private final BlobRepository blobs;
@@ -19,5 +22,8 @@ public final class BlobController {
     @DeleteMapping("/internal/storage/objects/{id}/references") public ResponseEntity<?> dereference(@PathVariable String id,@RequestBody Reference input){blobs.dereference(id,input.kind,input.referenceId);return ResponseEntity.noContent().build();}
     @GetMapping("/internal/storage/objects/{id}") public ResponseEntity<byte[]> read(@PathVariable String id){return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(blobs.read(id));}
     @PostMapping("/internal/storage/gc") public Map<String,Object> gc(){return Map.of("deleted",blobs.gc());}
-    @ExceptionHandler(RuntimeException.class) public ResponseEntity<?> unavailable(){return ResponseEntity.status(503).body(Map.of("code","STORAGE_OPERATION_UNCONFIRMED"));}
+    @ExceptionHandler(RuntimeException.class) public ResponseEntity<?> unavailable(RuntimeException failure){
+        LOG.error("Storage operation failed closed",failure);
+        return ResponseEntity.status(503).body(Map.of("code","STORAGE_OPERATION_UNCONFIRMED"));
+    }
 }
