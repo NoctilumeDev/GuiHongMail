@@ -18,6 +18,7 @@ GO = Path('D:/DevTools/Go/go1.27.2/bin/go.exe')
 NPM = Path('D:/Node.js/current/npm.cmd')
 PORTS = {'mailbox': 18080, 'ingress': 18081, 'delivery': 18082}
 COMMANDS = {'mailbox': './cmd/mailbox', 'ingress': './cmd/ingress', 'delivery': './cmd/delivery'}
+CONSUMER_GROUPS = ('guihong_mailbox_import_v1', 'guihong_delivery_v1')
 PROCESSES = lab.LAB / 'go-applications'
 process_identity = apps.process_identity
 tcp_server_owners = apps.tcp_server_owners
@@ -243,6 +244,31 @@ def request(role, path, method='GET'):
     return json.loads(body)
 
 
+def ensure_consumer_groups():
+    state = lab.load()
+    candidates = subprocess.check_output(
+        [lab.docker(), 'ps', '-q', '--filter', 'label=com.docker.compose.project=' + state['id'],
+         '--filter', 'label=com.docker.compose.service=broker'], text=True, encoding='utf-8').split()
+    if len(candidates) != 1:
+        raise RuntimeError('Exact owned running RocketMQ broker is unavailable')
+    broker = candidates[0]
+    inspected = json.loads(subprocess.check_output(
+        [lab.docker(), 'inspect', broker], text=True, encoding='utf-8'))[0]
+    labels = inspected['Config'].get('Labels') or {}
+    if labels.get('guihong.owner') != state['id'] or labels.get('com.docker.compose.service') != 'broker':
+        raise RuntimeError('RocketMQ broker ownership changed before group provisioning')
+    log_path = PROCESSES / ('consumer-groups-' + uuid.uuid4().hex + '.log')
+    with log_path.open('xb') as output:
+        for group in CONSUMER_GROUPS:
+            result = subprocess.run(
+                [lab.docker(), 'exec', broker, '/home/rocketmq/rocketmq-5.5.0/bin/mqadmin',
+                 'updateSubGroup', '-n', 'namesrv:9876', '-b', '127.0.0.1:20911', '-g', group],
+                stdout=output, stderr=subprocess.STDOUT, timeout=30)
+            if result.returncode:
+                raise RuntimeError('RocketMQ consumer group provisioning failed; retained ' + str(log_path))
+    return log_path
+
+
 def start(database_ports=None):
     lab.assert_owned()
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=lab.ROOT):
@@ -254,6 +280,8 @@ def start(database_ports=None):
     credentials = private()
     database_ports = database_ports or {}
     PROCESSES.mkdir(exist_ok=True)
+    group_log = ensure_consumer_groups()
+    print(json.dumps({'consumer_groups': list(CONSUMER_GROUPS), 'log': str(group_log)}))
     for role in lab.SERVICES:
         record = PROCESSES / (role + '.json')
         if record.exists():

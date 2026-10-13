@@ -92,7 +92,7 @@ func (s *Sender) publishLoop(ctx context.Context, runtime *platform.Runtime) err
 }
 
 func (importer *IngressImporter) consume(ctx context.Context, runtime *platform.Runtime) error {
-	return platform.Consume(ctx, runtime, "guihong.mailbox.import.v1", ingressTopic, func(callback context.Context, _ string, body []byte) error {
+	return platform.Consume(ctx, runtime, "guihong_mailbox_import_v1", ingressTopic, func(callback context.Context, _ string, body []byte) error {
 		var event ingressEvent
 		if err := json.Unmarshal(body, &event); err != nil || event.Version != 1 || event.SourceService != "ingress" || len(event.Recipients) == 0 || len(event.Recipients) > 10 {
 			return fmt.Errorf("invalid ingress event")

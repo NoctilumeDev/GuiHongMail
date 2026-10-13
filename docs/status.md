@@ -9,7 +9,7 @@
 | M0资格主线 | `b34783bd7b440cc466512986f0c74869a4c748e5`；仅文档/授权边界 |
 | M1 | Go `QUALIFIED`，运行资格 main `2a1dd5ae86ed01655cc723ae2d94176e8cdf4054`；PR/CI、fresh exact-main 三子门、资源聚合、三类负控和 owned 清理闭合。Java main `51fe46533cc45d7ef5d010db6803165de0780905` 的历史资格保留为对照；[Go M1 资格](acceptance/m1-go.md)、[Java M1 资格](acceptance/m1.md)、[M1G 证据](acceptance/m1g.md)、[资源合同修订 1.1](m1-resource-contract-1.1.md)、[运行账册](run-ledger.md) |
 | M2 | Go `QUALIFIED`，运行资格 main `4f92a5dfc646693237b476b4f38448d7bd798af6`；PR/CI、fresh exact-main 16 项运行门、真实 Edge、资源窗口、两类负控和 owned 清理闭合。Java 候选 `3136c6f` 只作迁移历史，不向 Go 提供资格；见 [Go M2 资格](acceptance/m2-go.md) |
-| M3 | `PLAN_FROZEN / IN_PROGRESS`；A08–A12、18 个具名用例与有限重试/取消/UNKNOWN 参数见 [M3 计划](m3-plan.md)，尚无实现或资格 |
+| M3 | `PLAN_FROZEN / IN_PROGRESS`；A08–A12、18 个具名用例与有限重试/取消/UNKNOWN 参数见 [M3 计划](m3-plan.md)；首次真实启动保留消费组字符首败，最小线缆坐标修订见 [M3 计划 1.1](m3-plan-1.1.md)，尚无运行资格 |
 | M4–M6 | `AUTHORIZED / NOT_STARTED`，依前一阶段门禁连续串行推进 |
 | M7 | `DEFERRED_HUMAN_PARTICIPATION`，需用户另行开启 |
 | E1 | `NOT_AUTHORIZED` |

@@ -68,7 +68,7 @@ func Run(ctx context.Context, runtime *platform.Runtime) error {
 	}
 	errorsChannel := make(chan error, 2)
 	go func() {
-		errorsChannel <- platform.Consume(ctx, runtime, "guihong.delivery.v1", sendTopic, func(callback context.Context, _ string, body []byte) error {
+		errorsChannel <- platform.Consume(ctx, runtime, "guihong_delivery_v1", sendTopic, func(callback context.Context, _ string, body []byte) error {
 			return acceptEvent(callback, runtime, body)
 		})
 	}()
