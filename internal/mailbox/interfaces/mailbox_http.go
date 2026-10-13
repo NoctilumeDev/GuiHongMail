@@ -164,6 +164,11 @@ func RegisterMailbox(mux *http.ServeMux, runtime *platform.Runtime, identity *ap
 			return
 		}
 		defer file.Close()
+		_, disposition, parseError := mime.ParseMediaType(header.Header.Get("Content-Disposition"))
+		if parseError != nil || disposition["filename"] != header.Filename {
+			mailboxError(w, &domain.InvalidError{Code: "INVALID_FILE_NAME"})
+			return
+		}
 		data, err := io.ReadAll(io.LimitReader(file, 4*1024*1024+1))
 		if err != nil || len(data) > 4*1024*1024 {
 			mailboxError(w, &domain.InvalidError{Code: "ATTACHMENT_SIZE_EXCEEDED"})
