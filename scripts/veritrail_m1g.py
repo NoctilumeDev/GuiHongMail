@@ -94,11 +94,13 @@ def build_probe(out):
     logged([str(GO), 'vet', './...'], out / 'go-vet.log', env=env)
     logged([str(GO), 'build', '-trimpath', '-ldflags', '-s -w', '-o', str(binary), './cmd/mqprobe'],
            out / 'go-build.log', env=env)
-    module_raw = subprocess.check_output([str(GO), 'list', '-m', '-json', GO_CLIENT], cwd=ROOT,
-                                         env=env, text=True, encoding='utf-8')
-    module = json.loads(module_raw)
     version_output = subprocess.check_output([str(GO), 'version', '-m', str(binary)], cwd=ROOT,
                                              env=env, text=True, encoding='utf-8')
+    version_lines = version_output.splitlines()
+    dependency = next((line.strip().split('\t') for line in version_lines
+                       if line.strip().startswith('dep\t' + GO_CLIENT + '\t')), None)
+    if dependency is None or len(dependency) != 4:
+        raise RuntimeError('built binary does not expose the selected RocketMQ module binding')
     go_env = subprocess.check_output([str(GO), 'env', 'GOVERSION', 'GOOS', 'GOARCH', 'GOROOT'], cwd=ROOT,
                                      env=env, text=True, encoding='utf-8').splitlines()
     facts = {
@@ -107,15 +109,13 @@ def build_probe(out):
         'goversion': go_env[0], 'goos': go_env[1], 'goarch': go_env[2], 'goroot': go_env[3],
         'archive_sha256': GO_ARCHIVE_SHA256,
         'environment_lock_sha256': sha_file(ROOT / 'docs' / 'go-environment-lock.json'),
-        'client_module': module['Path'], 'client_version': module['Version'], 'client_sum': module['Sum'],
+        'client_module': dependency[1], 'client_version': dependency[2], 'client_sum': dependency[3],
         'client_tag_commit': GO_CLIENT_COMMIT,
         'binary_sha256': sha_file(binary), 'binary_bytes': binary.stat().st_size,
-        'binary_build_info': version_output.splitlines(),
+        'binary_build_info': version_lines,
     }
     if facts['client_module'] != GO_CLIENT or facts['client_version'] != GO_CLIENT_VERSION:
         raise RuntimeError('resolved RocketMQ module does not match the sealed selection')
-    if not any(f'dep\t{GO_CLIENT}\t{GO_CLIENT_VERSION}\t' in line for line in facts['binary_build_info']):
-        raise RuntimeError('built binary does not bind the selected RocketMQ module')
     return binary, facts
 
 
@@ -518,7 +518,15 @@ def main():
     source = git('rev-parse', 'HEAD')
     identity = 'guihong-m1g-' + uuid.uuid4().hex
     out = lab.local_run(identity, create=True)
-    binary, build = build_probe(out)
+    try:
+        binary, build = build_probe(out)
+    except Exception as error:
+        failure = {'identity': identity, 'source_sha': source, 'classification': 'COLLECTOR_SETUP_FAILURE',
+                   'plan_sealed': False, 'lab_started': lab.LAB.exists(),
+                   'type': type(error).__name__, 'message': str(error)}
+        save(out / 'setup-failure.json', failure)
+        print(json.dumps(failure, ensure_ascii=False))
+        return 1
     source_facts = None
     if args.control == 'none':
         binding = {'run': identity, 'topic': identity + '-topic', 'group': identity + '-group'}
