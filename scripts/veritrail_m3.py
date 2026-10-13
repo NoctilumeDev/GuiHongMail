@@ -427,14 +427,32 @@ def collect(out):
     commit_raw = raw_message('M3 COMMIT UNKNOWN', 'COMMIT-UNKNOWN')
     commit_digest = hashlib.sha256(commit_raw).hexdigest()
     commit_spools_before = scalar('ingress', 'SELECT COUNT(*) FROM accepted_spools')
-    (proxy_root / 'arm').write_text('armed\n', encoding='utf-8')
-    try:
+    commit_refs_before = scalar('ingress', "SELECT COUNT(*) FROM object_refs WHERE ref_kind='INGRESS_SPOOL'")
+    lock_connection = connect('ingress', root=True)
+    lock_query = lock_connection.cursor()
+    lock_query.execute('LOCK TABLES ingress_outbox WRITE')
+    commit_result = {}
+    def submit_commit_unknown():
         try:
             code, message = commit_client.data(commit_raw)
-            commit_failure = {'prefix': commit_prefix, 'data': [code, message.decode(errors='replace')]}
+            commit_result.update(data=[code, message.decode(errors='replace')])
         except (smtplib.SMTPException, OSError) as failure:
-            commit_failure = {'prefix': commit_prefix, 'exception': type(failure).__name__ + ': ' + str(failure)}
+            commit_result.update(exception=type(failure).__name__ + ': ' + str(failure))
+    commit_thread = threading.Thread(target=submit_commit_unknown)
+    commit_thread.start()
+    try:
+        wait_until('committed ingress object reference before spool COMMIT', lambda: scalar('ingress',
+            "SELECT COUNT(*) FROM object_refs WHERE ref_kind='INGRESS_SPOOL'") == commit_refs_before + 1, 20)
+        (proxy_root / 'arm').write_text('armed\n', encoding='utf-8')
+        lock_query.execute('UNLOCK TABLES')
+        commit_thread.join(20)
+        if commit_thread.is_alive():
+            raise RuntimeError('commit-unknown SMTP thread did not finish')
+        commit_failure = {'prefix': commit_prefix, **commit_result}
     finally:
+        try: lock_query.execute('UNLOCK TABLES')
+        except pymysql.MySQLError: pass
+        lock_query.close(); lock_connection.close()
         try: commit_client.close()
         except OSError: pass
     wait_until('commit fault firing', lambda: (proxy_root / 'fired').is_file(), 15)
