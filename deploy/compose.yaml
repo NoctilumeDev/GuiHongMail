@@ -65,7 +65,7 @@ services:
     pids_limit: 128
     environment:
       HEAP_OPTS: '-Xms96m -Xmx128m -XX:MaxDirectMemorySize=128m -XX:-TieredCompilation -XX:CICompilerCount=1'
-      JAVA_OPT_EXT: '-XX:ActiveProcessorCount=1'
+      JAVA_OPT_EXT: '-XX:ActiveProcessorCount=1 -XX:-UseG1GC -XX:+UseSerialGC'
     command: ['sh', 'mqbroker', '-n', 'namesrv:9876', '-c', '/config/broker.conf']
     depends_on:
       namesrv: {condition: service_started}

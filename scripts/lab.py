@@ -158,8 +158,6 @@ def init():
         'queryMessageThreadPoolNums=1','adminBrokerThreadPoolNums=1','clientManageThreadPoolNums=1',
         'consumerManageThreadPoolNums=1','loadBalanceProcessorThreadPoolNums=1','recoverThreadPoolNums=1',
         'endTransactionThreadPoolNums=1','batchDispatchRequestThreadPoolNums=1',
-        'litePullMessageEnable=false','enableLiteEventMode=false','accountStatsEnable=false',
-        'enableBroadcastOffsetStore=false','enableDetailStat=false',
         'serverWorkerThreads=2','serverSelectorThreads=1','clientWorkerThreads=2','clientSelectorThreads=1'])+'\n')
     (LAB/'witness').mkdir()
     write_new(LAB/'state.json',json.dumps(state,indent=2)+'\n')
