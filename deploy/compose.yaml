@@ -37,7 +37,7 @@ services:
     cpus: 1.0
     pids_limit: 128
     environment:
-      JAVA_OPT_EXT: '-Xms64m -Xmx96m -XX:MaxDirectMemorySize=32m -XX:ActiveProcessorCount=1'
+      JAVA_OPT_EXT: '-Xms32m -Xmx64m -XX:MaxDirectMemorySize=32m -XX:ActiveProcessorCount=1 -XX:-TieredCompilation -XX:CICompilerCount=1'
     command: ['sh', 'mqnamesrv']
     ports: ['127.0.0.1:19876:9876']
     networks: [mq]
