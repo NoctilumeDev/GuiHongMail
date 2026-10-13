@@ -31,6 +31,20 @@ class ContainerBudgetTest(unittest.TestCase):
                          resource_guard.container_violation([{**healthy, 'oom_killed': True}]))
 
 
+class OwnedCleanupTest(unittest.TestCase):
+    def test_stop_refuses_force_when_pid_identity_changes(self):
+        owned={'lab_id':'lab','role':'mailbox','pid':123,'creation_ticks':1,'executable':str(apps.JAVA)}
+        changed={'creation_ticks':2,'executable':str(apps.JAVA)}
+        with tempfile.TemporaryDirectory() as directory:
+            records=Path(directory);(records/'mailbox.json').write_text(json.dumps(owned))
+            with patch.object(apps,'PROCESSES',records),patch.object(apps.lab,'SERVICES',('mailbox',)),\
+                 patch.object(apps.lab,'load',return_value={'id':'lab'}),patch.object(apps,'process_identity',return_value=changed),\
+                 patch.object(os,'kill') as terminate:
+                with self.assertRaisesRegex(RuntimeError,'PID ownership changed'):
+                    apps.stop()
+                terminate.assert_not_called()
+
+
 class BuildReceiptTest(unittest.TestCase):
     def test_exact_artifacts_are_verified_and_external_paths_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

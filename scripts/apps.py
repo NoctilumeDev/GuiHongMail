@@ -6,6 +6,7 @@ import http.client
 import json
 import os
 from pathlib import Path
+import signal
 import socket
 import subprocess
 import time
@@ -244,12 +245,27 @@ def stop():
         if owned['lab_id']!=lab.load()['id'] or current!={k:owned[k] for k in ('creation_ticks','executable')}:
             raise RuntimeError('PID ownership changed; stop without mutation')
         if Path(current['executable']).resolve()!=JAVA.resolve():raise RuntimeError('Owned executable mismatch')
-        request(role,'/internal/drain','POST');request(role,'/internal/shutdown','POST')
+        graceful=True
+        try:request(role,'/internal/drain','POST');request(role,'/internal/shutdown','POST')
+        except Exception:graceful=False
         until=time.monotonic()+30
         while time.monotonic()<until:
-            if process_identity(owned['pid']) is None:print(json.dumps({'stopped':role,'pid':owned['pid']}));break
+            if process_identity(owned['pid']) is None:print(json.dumps({'stopped':role,'pid':owned['pid'],'mode':'graceful' if graceful else 'exited'}));break
+            if not graceful:break
             time.sleep(.5)
-        else:raise RuntimeError('Owned application shutdown timeout; no unverified kill')
+        else:graceful=False
+        if process_identity(owned['pid']) is not None:
+            current=process_identity(owned['pid'])
+            if (owned['lab_id']!=lab.load()['id'] or current!={k:owned[k] for k in ('creation_ticks','executable')}
+                    or Path(current['executable']).resolve()!=JAVA.resolve()):
+                raise RuntimeError('PID ownership changed; force stop without mutation')
+            os.kill(owned['pid'],signal.SIGTERM)
+            until=time.monotonic()+10
+            while time.monotonic()<until:
+                if process_identity(owned['pid']) is None:
+                    print(json.dumps({'stopped':role,'pid':owned['pid'],'mode':'forced-owned-pid'}));break
+                time.sleep(.25)
+            else:raise RuntimeError('Exact owned PID did not exit after forced cleanup')
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('action',choices=['prepare','build','start','stop','status']);a=p.parse_args()
