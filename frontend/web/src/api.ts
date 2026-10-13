@@ -31,7 +31,11 @@ export class ApiClient {
   drafts(): Promise<Page<Draft>> { return this.request('/api/mailbox/drafts?size=30') }
   draft(id: string): Promise<Draft> { return this.request(`/api/mailbox/drafts/${id}`) }
   createDraft(body: Record<string, unknown>): Promise<Draft> { return this.request('/api/mailbox/drafts', { method: 'POST', body: JSON.stringify(body) }) }
-  saveDraft(draft: Draft): Promise<Draft> { return this.request(`/api/mailbox/drafts/${draft.id}`, { method: 'PUT', body: JSON.stringify(draft) }) }
+  saveDraft(draft: Draft): Promise<Draft> {
+    const body = { version: draft.version, subject: draft.subject, textBody: draft.textBody, htmlBody: draft.htmlBody,
+      to: draft.to, cc: draft.cc, bcc: draft.bcc, mode: draft.mode, sourceContentId: draft.sourceContentId }
+    return this.request(`/api/mailbox/drafts/${draft.id}`, { method: 'PUT', body: JSON.stringify(body) })
+  }
   deriveDraft(entryId: string, mode: string): Promise<Draft> { return this.request(`/api/mailbox/messages/${entryId}/drafts?mode=${encodeURIComponent(mode)}`, { method: 'POST' }) }
   async attach(draft: Draft, file: File): Promise<Draft> { const form = new FormData(); form.append('file', file); return this.request(`/api/mailbox/drafts/${draft.id}/attachments?version=${draft.version}`, { method: 'POST', body: form }, true, false) }
 

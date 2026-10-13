@@ -103,6 +103,12 @@ def message(subject, marker, attachment=True):
     return value.as_bytes()
 
 
+def draft_payload(value, **changes):
+    result = {key: value[key] for key in ('version','subject','textBody','htmlBody','to','cc','bcc','mode','sourceContentId')}
+    result.update(changes)
+    return result
+
+
 def sql_facts(secrets, account_ids, raw_digest):
     database = secrets['database']['mailbox']
     with pymysql.connect(host='127.0.0.1', port=13306, user=database['user'], password=database['password'],
@@ -161,8 +167,8 @@ def collect(out):
     _, _, search = alice.json('GET', '/api/mailbox/messages?folder=INBOX&size=30&q=ALICE-PRIVATE-MARKER')
 
     _, _, draft = alice.json('POST', '/api/mailbox/drafts', {'subject': '持久草稿', 'textBody': '初稿', 'htmlBody': '<b>初稿</b>', 'to': ['bob@guihong.test'], 'cc': [], 'bcc': [], 'mode': 'COMPOSE'}, expected=(201,))
-    _, _, updated = alice.json('PUT', '/api/mailbox/drafts/' + draft['id'], {**draft, 'textBody': '已更新'}, expected=(200,))
-    stale_status, _, stale_raw = alice.request('PUT', '/api/mailbox/drafts/' + draft['id'], {**draft, 'textBody': '旧写入'})
+    _, _, updated = alice.json('PUT', '/api/mailbox/drafts/' + draft['id'], draft_payload(draft,textBody='已更新'), expected=(200,))
+    stale_status, _, stale_raw = alice.request('PUT', '/api/mailbox/drafts/' + draft['id'], draft_payload(draft,textBody='旧写入'))
     stale_body = json.loads(stale_raw)
     bad_name_status, _, bad_name_raw = alice.upload(f"/api/mailbox/drafts/{draft['id']}/attachments?version={updated['version']}", '../secret.txt', b'bad')
     good_status, _, good_raw = alice.upload(f"/api/mailbox/drafts/{draft['id']}/attachments?version={updated['version']}", '证据.txt', b'draft-evidence')
