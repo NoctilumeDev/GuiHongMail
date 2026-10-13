@@ -211,7 +211,7 @@ def mq_send(payload, key, out):
         raise RuntimeError('mqadmin replay failed; retained ' + str(out))
 
 
-def smtp_transaction(raw, recipients, *, sender='outside@example.test', port=18025):
+def smtp_transaction(raw, recipients, *, sender='outside@example.test', port=12525):
     result = {'mail': None, 'rcpt': [], 'data': None, 'exception': None}
     client = smtplib.SMTP('127.0.0.1', port, timeout=15)
     try:
@@ -232,7 +232,7 @@ def smtp_transaction(raw, recipients, *, sender='outside@example.test', port=180
 
 
 def smtp_open(recipients, *, sender='outside@example.test'):
-    client = smtplib.SMTP('127.0.0.1', 18025, timeout=15)
+    client = smtplib.SMTP('127.0.0.1', 12525, timeout=15)
     client.ehlo(); mail = client.mail(sender)
     rcpt = [(recipient, *client.rcpt(recipient)) for recipient in recipients]
     return client, {'mail': mail[0], 'rcpt': [[address, code, message.decode(errors='replace')] for address, code, message in rcpt]}
