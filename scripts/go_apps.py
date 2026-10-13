@@ -283,8 +283,11 @@ def ensure_mq_bindings():
     return log_path
 
 
-def start(database_ports=None):
+def start(database_ports=None, roles=None):
     lab.assert_owned()
+    roles = tuple(roles or lab.SERVICES)
+    if not roles or len(set(roles)) != len(roles) or any(role not in lab.SERVICES for role in roles):
+        raise RuntimeError('Invalid Go application role selection')
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=lab.ROOT):
         raise RuntimeError('Application startup requires committed clean source')
     if lab.memory()['used_bytes'] > 14 * 1024 ** 3:
@@ -296,7 +299,7 @@ def start(database_ports=None):
     PROCESSES.mkdir(exist_ok=True)
     group_log = ensure_mq_bindings()
     print(json.dumps({'topics': list(TOPICS), 'consumer_groups': list(CONSUMER_GROUPS), 'log': str(group_log)}))
-    for role in lab.SERVICES:
+    for role in roles:
         record = PROCESSES / (role + '.json')
         if record.exists():
             archive_inactive(record, role)
@@ -344,10 +347,15 @@ def start(database_ports=None):
             raise RuntimeError('Go application did not become identifiable within 60s')
 
 
-def stop():
+def stop(roles=None):
     if not PROCESSES.exists():
         return
+    roles = tuple(roles or lab.SERVICES)
+    if not roles or len(set(roles)) != len(roles) or any(role not in lab.SERVICES for role in roles):
+        raise RuntimeError('Invalid Go application role selection')
     for role in reversed(lab.SERVICES):
+        if role not in roles:
+            continue
         record = PROCESSES / (role + '.json')
         if not record.exists():
             continue
@@ -396,5 +404,11 @@ def status():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=['prepare', 'build', 'start', 'stop', 'status'])
+    parser.add_argument('--role', action='append', choices=lab.SERVICES)
     arguments = parser.parse_args()
-    globals()[arguments.action]()
+    if arguments.action in {'start', 'stop'}:
+        globals()[arguments.action](roles=arguments.role)
+    elif arguments.role:
+        raise RuntimeError('--role is only valid for start or stop')
+    else:
+        globals()[arguments.action]()
