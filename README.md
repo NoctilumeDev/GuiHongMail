@@ -2,7 +2,7 @@
 
 > 云水之间，归鸿有信。
 
-**状态：`M0_CANDIDATE / NOT_SEALED / NO_RUNTIME` · 2026-10-13。** 这是交付给用户审核的 M0 工程方案，不是已创建 GitHub 仓库、已运行服务或已通过验收的产品。
+**状态：`M0_APPROVED / SEAL_PENDING / NO_RUNTIME` · 2026-10-13。** 用户已批准独立新仓库、UNKNOWN 默认暂停、仅排队取消和 SeaweedFS 选型，并授权补齐 M0 后连续施工 M1–M6。封存及 M1 门禁各自留证，不能将授权描述成运行时完成。见[授权与决定](docs/authorization.md)。
 
 ## 产品定位
 
@@ -16,7 +16,7 @@
 
 ## 工程结构
 
-独立仓库名称建议 `NoctilumeDev/GuiHongMail`，不修改 `dome`。三个有状态职责的服务：`mailbox-service`、`smtp-ingress`、`delivery-worker`，每个服务独立数据所有权与失败生命周期；Web 是客户端。MySQL8、RocketMQ、MinIO 采用项目隔离依赖，**不预设 Redis/Nacos/独立 Gateway**。实现严格遵守接口/应用/领域/基础设施依赖方向，先测试真实所有权边界，不按数量凑服务。
+独立仓库确定为 `NoctilumeDev/GuiHongMail`，本地目录 `C:\Users\lenovo\Desktop\GitHubProjects\GuiHongMail`，不修改 `dome`。三个有状态职责的服务：`mailbox-service`、`smtp-ingress`、`delivery-worker`，每个服务独立数据所有权与失败生命周期；Web 是客户端。MySQL8、RocketMQ、SeaweedFS 本地 S3 采用项目隔离依赖，**不预设 Redis/Nacos/独立 Gateway**。具体版本、镜像摘要、部署及资源预算在 M1 实测锁定；兼容性失败必须留证阻断，不能换未经批准的存储。
 
 ## 连续施工与截止点
 
@@ -35,6 +35,8 @@
 9. [VeriTrail 证据与裁决](docs/verification.md)
 10. [工程门禁、CI 与目录](docs/engineering-gates.md)
 11. [决策账册](docs/decisions.md) / [前端精修记录](design-qa.md) / [Agent 施工宪法](AGENTS.md)
-12. [Codex 一次性 M1→M6 开工交接词（等待授权）](docs/codex-handoff.md)
+12. [连续施工交接词与实际授权](docs/codex-handoff.md)
+
+补齐的冻结义务：[投递与取消状态机](docs/contracts/delivery-lifecycle.md)、[存储及接受后责任](docs/contracts/storage-lifecycle.md)、[旧快照恢复隔离](docs/contracts/recovery.md)、[验迹必过项](docs/acceptance-obligations.md)。
 
 **任何文档声明均不自动取得运行时资格。** M0 冻结以后，只能用新的明确版本更新合同，不能倒改既有失败证据或验收标准。

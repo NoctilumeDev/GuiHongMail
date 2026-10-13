@@ -1,0 +1,79 @@
+{
+  "content": {
+    "schema_version": "1.0",
+    "contract_version": 1,
+    "authority": "human:repository-owner:guihong-m1-m6-20261013",
+    "scope": "M0 contracts only; no runtime qualification",
+    "files": {
+      "design/references/README.md": {
+        "sha256": "f3309860280dcca2cfa5f7ad42e3c319f2cdf4dca78d3f919388030fb9adeeb8",
+        "bytes": 681
+      },
+      "design/references/guihong-inbox-light-ink-candidate.png": {
+        "sha256": "85c9a697ecc3d004a257fae8d73fe78a9f947bcb3cea7bce902455e9c0398972",
+        "bytes": 1809477
+      },
+      "docs/acceptance-obligations.md": {
+        "sha256": "d1899b9ea66fdb31f7393e03ffccf2df93022bd1ca7e69788e41bc9b7a727f4f",
+        "bytes": 4179
+      },
+      "docs/authorization.md": {
+        "sha256": "7b69fcebfef373e3fe230f9df7d548eb92d72e08b405a84e11f11f1acb987de6",
+        "bytes": 2939
+      },
+      "docs/continuous-run.md": {
+        "sha256": "2c04b11992cda9b3793d6c6e485f636c4e41f996af26cabd007459f87a6fe99c",
+        "bytes": 3484
+      },
+      "docs/contracts/delivery-lifecycle.md": {
+        "sha256": "eaa7f21d635a6beaf3cc01258650583b533dc5060d00aba29e93cb928f21afcf",
+        "bytes": 3915
+      },
+      "docs/contracts/mail-facts.md": {
+        "sha256": "200a512c886970902a81b1e43cccaf0ff751bc4c59c542552cd16e67004742ed",
+        "bytes": 6723
+      },
+      "docs/contracts/recovery.md": {
+        "sha256": "b56a9a9c9437dda89ba2c4e41ebc7b135af965338a3fbc388bad18b1d1f0cdbe",
+        "bytes": 2439
+      },
+      "docs/contracts/security.md": {
+        "sha256": "97bf2702aecc5b0cb8c07d1f413ae3cf3b090744e8efbc44e9f3774e08ece025",
+        "bytes": 3475
+      },
+      "docs/contracts/service-boundaries.md": {
+        "sha256": "394b8d86efd7560b7560376a4bcfc2bb76cd13821f32aca1b68621fc5bdca405",
+        "bytes": 5276
+      },
+      "docs/contracts/storage-lifecycle.md": {
+        "sha256": "b7bf648384a8968bea8a583868ccf11fdb1d35e7d0d6a4c80528c788f7abfb08",
+        "bytes": 4146
+      },
+      "docs/design.md": {
+        "sha256": "c0818f90723a242ad21ae45d0b70bf1e5314e11f98164f2131b19df07d43d5e2",
+        "bytes": 5518
+      },
+      "docs/engineering-gates.md": {
+        "sha256": "eb77f1f4308d255be790404be367e3f3222a200cc636d9c62059a2205642bf5d",
+        "bytes": 4072
+      },
+      "docs/failure-matrix.md": {
+        "sha256": "6bf8ee9370a49e0e4dae7fcfee6aca1db4c2a3cc1e0790919230a00b9d5aa600",
+        "bytes": 5286
+      },
+      "docs/m0.md": {
+        "sha256": "2bd9fc168717093449fc9276a4a67c16763aefd000f9630f1db0c086722261d2",
+        "bytes": 11673
+      },
+      "docs/milestones.md": {
+        "sha256": "543d1f5b266c764a7064f7c01bb7b827690c2699df9818320711081f4a3221cb",
+        "bytes": 6661
+      },
+      "docs/verification.md": {
+        "sha256": "d8c55f3394c47abe4769caecfeb7a71e19968a46b71337d04d647e47e7bebfc1",
+        "bytes": 4539
+      }
+    }
+  },
+  "digest": "1feb3418b68f0f176645350196313076a8e113ee7b7f54273f9efac8218fc460"
+}
