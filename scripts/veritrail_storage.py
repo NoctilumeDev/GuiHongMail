@@ -1,5 +1,6 @@
 """A04 actual single-node S3 qualification, sealed before operations; no M1 aggregate claim."""
 import argparse
+import base64
 from datetime import datetime, timezone
 import hashlib
 from importlib.metadata import version
@@ -46,6 +47,7 @@ def main():
     image=lock['images']['seaweedfs']['image']
     payload=('归鸿独立存储见证\r\n'+run+'\r\n').encode('utf-8')*8
     expected_hash=sha(payload)
+    expected_body=base64.b64encode(payload).decode('ascii')
     request={'source_sha':source,'lab_id':state['id'],'endpoint':'http://127.0.0.1:19833',
              'image':image,'payload_sha256':expected_hash,'payload_bytes':len(payload),
              'key_prefix':'qualification/'+run,'control':args.control,
@@ -69,7 +71,9 @@ def main():
         assertions += [hard(service+'-identity',base+'/service',service),hard(service+'-put',base+'/put/http',200),
                        hard(service+'-get',base+'/get/http',200),hard(service+'-bytes',base+'/get/sha256',expected_hash),
                        hard(service+'-delete',base+'/delete/http',204),hard(service+'-absent',base+'/get_after_delete/http',404),
+                       hard(service+'-body',base+'/get/body_base64',expected_body),
                        hard(service+'-restart-bytes',base+'/get_after_restart/sha256',expected_hash),
+                       hard(service+'-restart-body',base+'/get_after_restart/body_base64',expected_body),
                        hard(service+'-restart-http',base+'/get_after_restart/http',200)]
     for i in range(18):
         assertions.append(hard('cross-service-denial-'+str(i),f'cross_service/{i}/http',403))
@@ -109,7 +113,7 @@ def main():
             if action=='get_object':
                 # Bound independently of ContentLength; only controlled small probe bytes are requested.
                 with reply['Body'] as stream: data=stream.read(5242881)
-                result.update(bytes=len(data),sha256=sha(data))
+                result.update(bytes=len(data),sha256=sha(data),body_base64=base64.b64encode(data).decode('ascii'))
         except ClientError as error:
             result={'http':error.response['ResponseMetadata']['HTTPStatusCode'],'code':error.response['Error']['Code']}
         with events.open('a',encoding='utf-8',newline='\n') as stream:

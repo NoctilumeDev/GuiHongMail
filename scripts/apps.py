@@ -92,7 +92,17 @@ def build():
         p=subprocess.run([str(MVN),'-B','-ntp','-s',str(settings),'-Dmaven.repo.local='+str(lab.ROOT/'.artifacts/m2'),
             '-f',str(lab.ROOT/'backend/pom.xml'),'-Dguihong.source_sha='+sha,'verify'],cwd=lab.ROOT,env=environment(),stdout=log,stderr=subprocess.STDOUT,timeout=600)
     if p.returncode:raise RuntimeError('Build failed; retained '+str(target))
-    print(json.dumps({'source_sha':sha,'build_log':str(target),'exit_code':p.returncode}))
+    artifacts=[]
+    for module in ('platform-common',*MODULES.values()):
+        jar=lab.ROOT/'backend'/module/'target'/(module+'-0.1.0-SNAPSHOT.jar')
+        if not jar.is_file():raise RuntimeError('Build succeeded without expected artifact '+str(jar))
+        artifacts.append({'module':module,'path':jar.relative_to(lab.ROOT).as_posix(),
+                          'bytes':jar.stat().st_size,'sha256':hashlib.sha256(jar.read_bytes()).hexdigest()})
+    receipt={'schema':'GuiHongBuildReceipt/1.0','source_sha':sha,'exit_code':p.returncode,
+             'log':target.relative_to(lab.ROOT).as_posix(),'log_sha256':hashlib.sha256(target.read_bytes()).hexdigest(),
+             'artifacts':artifacts}
+    lab.write_new(root/('build-'+sha+'.json'),json.dumps(receipt,indent=2,sort_keys=True)+'\n')
+    print(json.dumps(receipt))
 
 def start(database_ports=None):
     lab.assert_owned()
