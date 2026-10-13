@@ -272,11 +272,15 @@ def collect(out):
 
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('--control', choices=['none','wrong-binding','missing-evidence'], default='none'); args=parser.parse_args()
+    parser = argparse.ArgumentParser(); parser.add_argument('--control', choices=['none','wrong-binding','missing-evidence'], default='none')
+    parser.add_argument('--facts-from'); args=parser.parse_args()
     if git('status','--porcelain'):
         raise RuntimeError('M2 evidence requires committed clean source')
+    if args.facts_from and args.control == 'none':
+        raise RuntimeError('Reusing facts is limited to negative controls')
     source=git('rev-parse','HEAD'); run='guihong-m2-'+uuid.uuid4().hex; out=lab.local_run(run,create=True)
-    request={'source_sha':source,'contract_sha256':hashlib.sha256((ROOT/'docs/m2-plan.md').read_bytes()).hexdigest(),'control':args.control}
+    request={'source_sha':source,'contract_sha256':hashlib.sha256((ROOT/'docs/m2-plan.md').read_bytes()).hexdigest(),'control':args.control,
+             'facts_from':args.facts_from}
     spec={'id':'m2-runtime','contract':{'id':'guihong-m2-local','version':'1.0'},'evidence_type':'guihong.m2',
           'coordinates':request,'projections':['source_sha','cases','http','database','storage','browser','restart','resource','boundary'],
           'canonicalization_profile':'veritrail-json-c14n/1'}
@@ -292,7 +296,13 @@ def main():
         'reproduction_steps':['Start the exact immutable Go build in a fresh owned lab.','Run this collector and inspect the retained browser, API, SQL, S3, restart and resource facts.'],
         'cleanup_steps':['Stop exact owned application PIDs and remove only the owned lab after evidence retention.']})
     save(out/'sealed-plan.json',plan);save(out/'request.json',request);status='COMPLETED';error=None
-    try:facts=collect(out)
+    try:
+        if args.facts_from:
+            source_path=(ROOT/args.facts_from).resolve();local_root=(ROOT/'artifacts/local').resolve()
+            if not source_path.is_file() or not source_path.is_relative_to(local_root):raise RuntimeError('Control facts must come from retained local evidence')
+            facts=json.loads(source_path.read_text(encoding='utf-8'))['facts']
+            if facts.get('source_sha')!=source or not all(facts.get('cases',{}).values()):raise RuntimeError('Control facts are not a same-source complete PASS candidate')
+        else:facts=collect(out)
     except Exception as failure:
         status='ERROR';error={'exception_type':type(failure).__name__,'message':str(failure)};facts={'source_sha':source,'cases':{},'boundary':'M2_MAILBOX_AND_WEB_ONLY'};save(out/'collection-error.json',error)
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],
