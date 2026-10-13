@@ -8,6 +8,7 @@ import subprocess
 import time
 import uuid
 import apps
+import go_apps
 import lab
 
 INFRASTRUCTURE = ('broker', 'mysql', 'namesrv', 'seaweedfs')
@@ -118,7 +119,8 @@ def rss(pid):
         return value.working_set
     finally:kernel.CloseHandle(ctypes.c_void_p(handle))
 
-def run(duration):
+def run(duration, runtime_profile='java'):
+    application = apps if runtime_profile == 'java' else go_apps
     lab.assert_owned();contracts=container_contract();target=lab.LAB/('resource-'+uuid.uuid4().hex+'.jsonl');high=0
     deadline=time.monotonic()+duration
     with target.open('x',encoding='utf-8',newline='\n') as log:
@@ -128,9 +130,9 @@ def run(duration):
                 containers=container_snapshot(contracts)
                 reason=container_violation(containers)
                 for role in lab.SERVICES:
-                    path=apps.PROCESSES/(role+'.json')
+                    path=application.PROCESSES/(role+'.json')
                     if not path.exists():continue
-                    owner=json.loads(path.read_text());actual=apps.process_identity(owner['pid'])
+                    owner=application.owned_process(role);actual=apps.process_identity(owner['pid'])
                     if actual is None:continue
                     if actual!={k:owner[k] for k in ('creation_ticks','executable')} or owner['lab_id']!=lab.load()['id']:
                         raise RuntimeError('PID ownership changed; no stop/mutation of unknown process')
@@ -146,12 +148,13 @@ def run(duration):
                  'full_topology':full_topology,'consecutive_high':high,'stop_reason':reason,'observation_error':error}
             log.write(json.dumps(row)+'\n');log.flush();os.fsync(log.fileno())
             if reason:
-                apps.stop();lab.assert_owned();lab.compose(['stop','--timeout','20']);apps.stop()
+                application.stop();lab.assert_owned();lab.compose(['stop','--timeout','20']);application.stop()
                 print(json.dumps({'stopped':reason,'evidence':str(target)}),flush=True);return 2
             time.sleep(5)
     print(json.dumps({'window_complete':duration,'evidence':str(target)}),flush=True);return 0
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--duration',type=int,default=600);a=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('--duration',type=int,default=600)
+    p.add_argument('--runtime',choices=['java','go'],default='java');a=p.parse_args()
     if a.duration<5 or a.duration>3600:raise RuntimeError('Watchdog window must be 5..3600 seconds')
-    raise SystemExit(run(a.duration))
+    raise SystemExit(run(a.duration,a.runtime))
