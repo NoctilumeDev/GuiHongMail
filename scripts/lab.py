@@ -128,7 +128,7 @@ def init():
         'brokerIP1=127.0.0.1','listenPort=20911','autoCreateTopicEnable=false','autoCreateSubscriptionGroup=false',
         'flushDiskType=SYNC_FLUSH','storePathRootDir=/home/rocketmq/store','mapedFileSizeCommitLog=67108864',
         'maxMessageSize=1048576','diskMaxUsedSpaceRatio=85','deleteWhen=04','fileReservedTime=72',
-        'enableControllerMode=false'])+'\n')
+        'enableControllerMode=false','timerWheelEnable=false'])+'\n')
     (LAB/'witness').mkdir()
     write_new(LAB/'state.json',json.dumps(state,indent=2)+'\n')
     print(json.dumps({'id':run_id,'initialized':True,'credentials':'private ignored files only'}))

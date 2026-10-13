@@ -11,5 +11,6 @@
 | 2026-10-13T04:32:10.3087611Z | 首次 lab 启动日志持久化：source `4209bbc8ff52123b7f70dcbab595f8d24dee53d1`；资源归属检查将小写 `no such volume` 当作未知，启动前停止，容器尚未创建。TOOL_SETUP_FAILURE；原 `storage-startup-first.log` 保留，修复仅规范化具名不存在错误 |
 | 2026-10-13T04:34:16.129340Z | 首次 A04 source `fd11bfb94ba19710dacf9c46d9e4cfb67a91e408`，运行 `guihong-s3-0cec27b7e33a4b5db5520293105f9a5f`，ERROR / PENDING。CRUD、18 次拒绝等源事实已收；重启后探针只等 TCP，认证 GET 遇连接关闭，未取得持久化证据。COLLECTOR_READINESS_ERROR，原 Plan/Evidence/Bundle/对象保留，按原断言修复就绪等待再验 |
 | 2026-10-13T04:45:08Z | Broker 首次启动 source `0833982`：Exit 253 / OOM false；新项目卷 root 目录不允许镜像 UID 3000 创建 store/config/commitlog。DEPLOYMENT_PERMISSION_FAILURE；日志原件在 ignored lab/broker-first-logs 保存；修复仅增加有 owner、无网络、64 MiB 的一次性根目录 chown 初始化，不递归改写卷内数据 |
+| 2026-10-13T04:51:07Z | 卷权限修复后 Broker 在 TimerWheel 初始化遇 Java Direct buffer memory，Exit 255；Docker OOM false。保留 after-volume-init 日志。此 profile 不使用 MQ 定时消息；配置禁用默认 timerWheel，不增加 512 MiB 容器上限或直接内存上限，也不改 SYNC_FLUSH、普通持久队列及 Delivery 自有有限重试义务 |
 
 环境可用窗口已恢复，首败不会被后续成功覆盖。主页参考文档按当前中文主线 `NoctilumeDev/NoctilumeDev-ZH@5fe4cddcddc76d883476d004147fcddfaa24ac06` 阅读；同名本地 profile 分支包含更晚的未合入补充，不把它当已发布事实。M6 结束时间、墙钟时长与 Release 身份尚不存在。
