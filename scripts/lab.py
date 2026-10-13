@@ -42,6 +42,8 @@ def memory():
 def write_new(path, data):
     with path.open('x', encoding='utf-8', newline='\n') as f:
         f.write(data)
+        f.flush()
+        os.fsync(f.fileno())
 
 def load():
     state = json.loads((LAB/'state.json').read_text(encoding='utf-8'))

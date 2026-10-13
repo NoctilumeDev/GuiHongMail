@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import hashlib
 from importlib.metadata import version
 import json
+import os
 from pathlib import Path
 import socket
 import subprocess
@@ -13,7 +14,7 @@ import uuid
 
 import boto3
 from botocore.config import Config
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ConnectionClosedError, EndpointConnectionError, ReadTimeoutError
 from veritrail.acceptance_plan import observation_spec_digest, seal_acceptance_plan
 from veritrail.acceptance_reporting import create_acceptance_bundle
 from veritrail.canonical import sha256_json
@@ -112,7 +113,7 @@ def main():
         except ClientError as error:
             result={'http':error.response['ResponseMetadata']['HTTPStatusCode'],'code':error.response['Error']['Code']}
         with events.open('a',encoding='utf-8',newline='\n') as stream:
-            stream.write(json.dumps({'time':datetime.now(timezone.utc).isoformat(),'action':action,'bucket':bucket,'key':key,'result':result},ensure_ascii=False)+'\n');stream.flush()
+            stream.write(json.dumps({'time':datetime.now(timezone.utc).isoformat(),'action':action,'bucket':bucket,'key':key,'result':result},ensure_ascii=False)+'\n');stream.flush();os.fsync(stream.fileno())
         return result
     facts={'source_sha':git('rev-parse','HEAD'),'source_clean':not bool(git('status','--porcelain')),
            'm1_contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),'lock_sha256':sha((ROOT/'docs/environment-lock.json').read_bytes()),
@@ -162,16 +163,30 @@ def main():
                 facts['backend'].append({'container_ip':ip,'port':port,'connect_result':result})
         restarted=lab.compose(['restart','--timeout','20','seaweedfs'],capture=True)
         facts['restart']={'command_exit':restarted.returncode,'container_id_unchanged':lab.compose(['ps','-q','seaweedfs'],capture=True).stdout.strip()==container_id}
-        # Fixed bounded readiness wait before new authenticated reads, no mutation while unavailable.
-        for attempt in range(30):
-            with socket.socket() as probe:
-                if probe.connect_ex(('127.0.0.1',19833))==0:break
+        # A published TCP port can precede the authenticated S3/filer/volume readiness.
+        # Retain transient transport/5xx facts; never retry definite 404/403 or bad bytes into a PASS.
+        ready_deadline=time.monotonic()+30
+        facts['restart']['readiness_observations']=[]
+        while True:
+            try:
+                reply=clients['mailbox'].head_bucket(Bucket=private['storage']['mailbox']['bucket'])
+                facts['restart']['readiness_observations'].append({'http':reply['ResponseMetadata']['HTTPStatusCode']})
+                break
+            except (ConnectionClosedError,EndpointConnectionError,ReadTimeoutError) as error:
+                facts['restart']['readiness_observations'].append({'transport_error':type(error).__name__})
+            except ClientError as error:
+                http=error.response['ResponseMetadata']['HTTPStatusCode']
+                facts['restart']['readiness_observations'].append({'http':http})
+                if http<500:raise
+            if time.monotonic()>=ready_deadline:raise RuntimeError('Authenticated S3 readiness deadline exceeded')
             time.sleep(.5)
         for row in facts['operations']:
             service=row['service'];row['get_after_restart']=operation(clients[service],'get_object',private['storage'][service]['bucket'],request['key_prefix']+'/'+service+'-retained')
     except Exception as error:
         status='ERROR';error_record={'exception_type':type(error).__name__,'message':str(error)}
         save(out/'collection-error.json',error_record)
+    facts['source_sha']=git('rev-parse','HEAD')
+    facts['source_clean']=not bool(git('status','--porcelain'))
     if args.control=='wrong-hash' and facts['operations']:
         facts['operations'][0]['get']['sha256']='0'*64
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1',
