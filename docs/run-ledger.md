@@ -16,5 +16,7 @@
 | 2026-10-13T05:03:55Z | 有界线程池配置已实际加载，Broker 仍 Exit 255 / OOM false；首败与 after-thread-profile 日志保留，不能宣称 MQ 可用 |
 | 2026-10-13T05:50:03Z | 首次编译准备在 PowerShell 参数解析处失败，尚未执行 Java 编译；原 first-compiler-setup.log 保留。后续以独立参数传入 Maven 仓库路径，不改全局配置 |
 | 2026-10-13T05:56:56Z | 原配置复现仍 Exit 255；退出前采样 263.8 MiB / 512 MiB、63 PIDs，但未捕获失败瞬间峰值。官方 5.5.0 ScheduleMessageService 按 delay level 启动线程，单机 profile 把默认 18 级收束到 3 级（1s/5s/10s），不提供用户定时发送、不改变 Delivery 重试义务；所有硬上限保持 |
+| 2026-10-13T06:11:23Z | source `9b7be12651ac5584de9ae1fc69aadbbff16f6918` 三模块编译成功；Broker 日志改为保留全部 INFO 的同步单出口后实际约 100 PIDs / 280 MiB，随后三服务真实启动、schema V1 迁移、三依赖就绪和正常退出。开发观察尚未封存正式 Plan，不宣称子门资格 |
+| 2026-10-13T06:26:44Z | source `4b84250969bc8ae811cfa8a6a604dd4a0c3676d7` 第一 foundation 运行 `guihong-foundation-f0c1dbe22e5e4a7bb9c66a4aa8066081` ERROR / PENDING；Mailbox 在启动时因 final Repository 不允许 Spring 异常转换代理退出，启动器随后遇退出进程的路径读取竞态。原应用日志与 Plan/Evidence/Bundle 保留；schema V2 已执行并有库外完成记录，后续不重置数据库 |
 
 环境可用窗口已恢复，首败不会被后续成功覆盖。主页参考文档按当前中文主线 `NoctilumeDev/NoctilumeDev-ZH@5fe4cddcddc76d883476d004147fcddfaa24ac06` 阅读；同名本地 profile 分支包含更晚的未合入补充，不把它当已发布事实。M6 结束时间、墙钟时长与 Release 身份尚不存在。

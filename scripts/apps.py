@@ -36,10 +36,14 @@ def process_identity(pid):
         values=[ctypes.c_ulonglong() for _ in range(4)]
         if not kernel.GetProcessTimes(ctypes.c_void_p(handle),*[ctypes.byref(x) for x in values]):
             raise RuntimeError('Cannot bind PID creation time')
+        exit_code=ctypes.c_ulong()
+        if not kernel.GetExitCodeProcess(ctypes.c_void_p(handle),ctypes.byref(exit_code)):
+            raise RuntimeError('Cannot read owned process state')
+        if exit_code.value!=259:return None
         size=ctypes.c_ulong(32768);name=ctypes.create_unicode_buffer(size.value)
         if not kernel.QueryFullProcessImageNameW(ctypes.c_void_p(handle),0,name,ctypes.byref(size)):
+            if kernel.GetExitCodeProcess(ctypes.c_void_p(handle),ctypes.byref(exit_code)) and exit_code.value!=259:return None
             raise RuntimeError('Cannot bind process executable')
-        exit_code=ctypes.c_ulong()
         if not kernel.GetExitCodeProcess(ctypes.c_void_p(handle),ctypes.byref(exit_code)):
             raise RuntimeError('Cannot read owned process state')
         if exit_code.value!=259:return None

@@ -12,7 +12,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcIdentityRepository implements IdentityRepository {
+public class JdbcIdentityRepository implements IdentityRepository {
     private final JdbcTemplate jdbc;private final WitnessGate witness;private final FoundationController foundation;
     private final RowMapper<Account> account=(r,n)->new Account(r.getString("account_id"),r.getString("address"),r.getString("display_name"),r.getString("password_hash"),r.getBoolean("enabled"),r.getLong("auth_epoch"),r.getString("role"));
     public JdbcIdentityRepository(JdbcTemplate jdbc,WitnessGate witness,FoundationController foundation){this.jdbc=jdbc;this.witness=witness;this.foundation=foundation;}
