@@ -176,7 +176,7 @@ def owned_process(role):
     return owned
 
 
-def owned_http(role, path, method='GET', body=None, headers=None, internal=False):
+def owned_http(role, path, method='GET', body=None, headers=None, internal=False, max_bytes=7 * 1024 * 1024):
     owned = owned_process(role)
     connection = http.client.HTTPConnection('127.0.0.1', PORTS[role], timeout=10)
     try:
@@ -197,12 +197,19 @@ def owned_http(role, path, method='GET', body=None, headers=None, internal=False
             outbound.update(Authorization='Bearer ' + private()['internal'][role], **{'X-GuiHong-Service': 'lab'})
         connection.request(method, path, body=body, headers=outbound)
         response = connection.getresponse()
-        raw = response.read(7 * 1024 * 1024 + 1)
-        if len(raw) > 7 * 1024 * 1024:
+        raw = response.read(max_bytes + 1)
+        if len(raw) > max_bytes:
             raise RuntimeError('Go application response exceeded limit')
         return response.status, response.headers, raw
     finally:
         connection.close()
+
+
+def request(role, path, method='GET'):
+    status, _, body = owned_http(role, path, method=method, internal=True, max_bytes=1024 * 1024)
+    if status < 200 or status >= 300:
+        raise RuntimeError('Owned internal request returned HTTP ' + str(status))
+    return json.loads(body)
 
 
 def start(database_ports=None):
