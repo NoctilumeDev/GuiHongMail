@@ -247,6 +247,8 @@ def capture_resource_window(process, binary, out):
                                'creation_ticks': identity['creation_ticks'], 'executable': identity['executable']}
                 if value > PROBE_RSS_LIMIT:
                     reason = reason or 'APPLICATION_RSS_STOP_LINE'
+            elif process.poll() is not None:
+                break
             else:
                 reason = reason or 'PROBE_IDENTITY_CHANGED'
             consecutive_high = consecutive_high + 1 if memory['used_bytes'] > HOST_LIMIT else 0
