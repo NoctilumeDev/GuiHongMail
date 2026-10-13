@@ -1,10 +1,10 @@
 # 归鸿 · Codex / Agent 施工宪法
 
-> 用户于 2026-10-13 明确批准补齐并冻结 M0，授权连续施工 M1–M6，等同有效 `M1_START`，不再索取例行批准。先通过 M0 封存门，再开始 M1 实际动作。授权原意见 `docs/authorization.md`；M7/E1 未授权。
+> 用户于 2026-10-13 明确批准补齐并冻结 M0，授权连续施工 M1–M6，等同有效 `M1_START`，不再索取例行批准。用户随后批准 [M0.1 Go 运行时追加授权](docs/m0.1-go-runtime.md)：保留同一 Git 历史，把三个后端服务迁移到 Go，并从 M1 重新资格化。Java exact-SHA 仅作基线；M7/E1 未授权。
 
 ## 恢复事实与权威文件
 
-先读 `README.md`、`docs/m0.md`、`docs/milestones.md`、`docs/continuous-run.md`、相关 `docs/contracts/*`、`docs/design.md`、`docs/verification.md`、`docs/decisions.md`；核对分支、工作树、exact SHA 和未提交状态。聊天上下文和上一轮成功不是当前工程事实。用户已授权创建独立 GitHub 仓库；建立并读回实际身份，不臆造 Release、CI 或服务。
+先读 `README.md`、`docs/m0.md`、`docs/m0.1-go-runtime.md`、`docs/milestones.md`、`docs/continuous-run.md`、相关 `docs/contracts/*`、`docs/design.md`、`docs/verification.md`、`docs/decisions.md`；核对分支、工作树、exact SHA 和未提交状态。聊天上下文和上一轮成功不是当前工程事实。Go 候选不得继承 Java M1/M2 结论；建立并读回实际身份，不臆造 Release、CI 或服务。
 
 ## 一次授权，连续完成 M1 → M6
 
@@ -24,7 +24,7 @@
 
 ## 分层与反例边界
 
-各服务 `interfaces -> application/domain <- infrastructure`；Domain 不依赖 Spring/SMTP/DB/MQ 实现；跨服务只用版本化 API/事件和可验证引用，不能跨服务写库、共享 Entity、反向调用环。`platform-common` 只放技术性工具，不放业务状态机。业务分类算法在 Mailbox 域内提供可替换端口，不创建无必要的第四服务。
+各 Go 服务保持 `interfaces -> application/domain <- infrastructure`；Domain 不依赖 HTTP/SMTP/SQL/S3/MQ 具体实现；跨服务只用版本化 API/事件和可验证引用，不能跨服务写库、共享持久模型、反向调用环。共享 Go 包只放技术性工具，不放业务状态机。业务分类算法在 Mailbox 域内提供可替换端口，Python 只在 M4 的真实算法需要出现后接入，不创建无必要的第四常驻服务。
 
 M5 从**冻结的 M4 候选**用外部错题与当前真实故障机制独立攻击：正常对照、最小触发、独立事实读回、恢复与遗留物清理；不按组合全排列追求 AOP 式无限扩张。新机制/高风险/反驳原证明才额外扩展；不可验证时保留明确 `UNKNOWN/NOT_PROVEN` 和再入条件。独立测试/产品角色不能把施工者自述当真。
 

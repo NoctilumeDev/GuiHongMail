@@ -34,3 +34,6 @@
 | 2026-10-13T12:04:38.442219Z | main `51fe46533cc45d7ef5d010db6803165de0780905` 在 fresh lab `guihong-local-8de28dc30487` 取得 foundation `guihong-foundation-321b9ed4b4b1417bb7979bcbca4537cc`、S3 `guihong-s3-d4774597e4ec4107bea5bc5482da4672`、objects `guihong-objects-843aee60d46443a68b7d5f3bf7c9e47b` 三个 PASS；exact-main 聚合 `guihong-m1-fd513a0d50d64015a5318c703db21135` COMPLETED / PASS，并断言 HEAD 与 origin/main 相同。资源窗口无停止，最长全拓扑 10 样本；应用已停，owned 容器/网络已移除。M1 取得 QUALIFIED，下一阶段 M2 |
 
 环境可用窗口已恢复，首败不会被后续成功覆盖。主页参考文档按当前中文主线 `NoctilumeDev/NoctilumeDev-ZH@5fe4cddc76d883476d004147fcddfaa24ac06` 阅读；同名本地 profile 分支包含更晚的未合入补充，不把它当已发布事实。M6 结束时间、墙钟时长与 Release 身份尚不存在。
+
+| 2026-10-13T13:18:49.2360532Z | 人工介入 3：项目所有者批准保留同一 Git 历史，将三个后端服务由 Java 迁移到 Go，并允许 Go 工具链安装在 D 盘；Java exact-SHA 资格保留为对照，Go 从 M1 重新取证。`baseline/java-m2-candidate-20261013` 封存 `3136c6f`；新工作树/分支为 `rewrite/go-runtime`。官方 Go 1.27.2 Windows amd64 ZIP 在解压前核对完整 SHA-256 `1314008898bd40df77af4b014f777f08873dbdfbcd3d92308728ee03304fe04f`，安装到 `D:\DevTools\Go\go1.27.2` 并仅加入用户 PATH，下载 ZIP 与空 staging 已删除。全面移植前只执行 M1G RocketMQ/资源有限预检，不增加 Proxy、不自动换 MQ |
+| 2026-10-13T13:20Z | M0.1 第一次文档门失败：追加授权内容被写入原 `docs/authorization.md`，`scripts/check.py docs` 以 `M0 frozen bytes changed` 拒绝。未进行运行观察；修改已从冻结文件撤回，追加授权只保存在新 `docs/m0.1-go-runtime.md`，旧 M0 seal 与摘要保持不变 |

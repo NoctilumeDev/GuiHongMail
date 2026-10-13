@@ -1,0 +1,31 @@
+{
+  "schema": "GuiHongGoEnvironmentLock/1.0",
+  "recorded_at": "2026-10-13",
+  "status": "PREFLIGHT_SELECTED_NOT_QUALIFIED",
+  "go": {
+    "version": "go1.27.2",
+    "os_arch": "windows/amd64",
+    "archive": "go1.27.2.windows-amd64.zip",
+    "archive_sha256": "1314008898bd40df77af4b014f777f08873dbdfbcd3d92308728ee03304fe04f",
+    "install_root": "D:\\DevTools\\Go\\go1.27.2",
+    "source": "https://go.dev/dl/?mode=json"
+  },
+  "rocketmq_go_client": {
+    "module": "github.com/apache/rocketmq-client-go/v2",
+    "version": "v2.1.2",
+    "tag_commit": "7eedaf948c6076c716972724782f4837e1f9caa6",
+    "protocol": "RocketMQ Remoting",
+    "qualification": "PENDING_REAL_PROBE"
+  },
+  "server_baseline": {
+    "rocketmq": "5.5.0",
+    "topology": ["namesrv", "broker"],
+    "proxy_allowed": false,
+    "contract": "docs/m1-resource-contract-1.1.md"
+  },
+  "notes": [
+    "The official RocketMQ 5.x Go gRPC SDK requires Proxy and is outside this topology.",
+    "Module selection and a successful build are not compatibility qualification.",
+    "Transitive module checksums are authoritative only after committed go.sum and clean-source verification."
+  ]
+}
