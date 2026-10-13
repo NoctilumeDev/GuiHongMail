@@ -1,0 +1,12 @@
+{
+  "boundary": "M0_DOCUMENTS_ONLY",
+  "bundle": "artifacts\\local\\guihong-m0-3f98378d482342f0a4d4979db4b0b39c\\bundle",
+  "control": "missing-evidence",
+  "execution_status": "COMPLETED",
+  "expected": "PENDING",
+  "identity": "guihong-m0-3f98378d482342f0a4d4979db4b0b39c",
+  "m0_digest": "1feb3418b68f0f176645350196313076a8e113ee7b7f54273f9efac8218fc460",
+  "public_core_version": "0.13.0",
+  "source_sha": "c7baf61c91ca1c4a5246455050b9718002f11bc2",
+  "verdict": "PENDING"
+}
