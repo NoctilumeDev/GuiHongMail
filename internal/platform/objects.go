@@ -245,7 +245,7 @@ func (repository *ObjectRepository) GC(ctx context.Context) ([]string, error) {
 		FROM stored_objects o WHERE lifecycle IN('ORPHAN','DELETING') AND in_flight=0
 		AND created_at<DATE_SUB(NOW(6),INTERVAL 60 SECOND)
 		AND NOT EXISTS(SELECT 1 FROM object_refs r WHERE r.object_id=o.object_id)
-		ORDER BY created_at LIMIT 50`)
+		ORDER BY CASE WHEN lifecycle='DELETING' THEN 0 ELSE 1 END,created_at,object_id LIMIT 50`)
 	if err != nil {
 		return nil, err
 	}
@@ -269,15 +269,51 @@ func (repository *ObjectRepository) GC(ctx context.Context) ([]string, error) {
 		}
 		claimed := false
 		err := repository.witness.Write(ctx, "object-gc-claim|"+blob.ID, func(tx *sql.Tx) error {
-			result, err := tx.ExecContext(ctx, `UPDATE stored_objects SET lifecycle='DELETING'
-				WHERE object_id=? AND lifecycle IN('ORPHAN','DELETING') AND in_flight=0
-				AND NOT EXISTS(SELECT 1 FROM object_refs WHERE object_id=?)`, blob.ID, blob.ID)
+			var state string
+			var inFlight int
+			err := tx.QueryRowContext(ctx,
+				"SELECT lifecycle,in_flight FROM stored_objects WHERE object_id=? FOR UPDATE", blob.ID,
+			).Scan(&state, &inFlight)
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil
+			}
 			if err != nil {
 				return err
 			}
-			count, err := result.RowsAffected()
-			claimed = err == nil && count == 1
-			return err
+			if (state != "ORPHAN" && state != "DELETING") || inFlight != 0 {
+				return nil
+			}
+			var references int
+			if err := tx.QueryRowContext(ctx,
+				"SELECT COUNT(*) FROM object_refs WHERE object_id=?", blob.ID,
+			).Scan(&references); err != nil {
+				return err
+			}
+			if references != 0 {
+				return nil
+			}
+			if state == "ORPHAN" {
+				result, err := tx.ExecContext(ctx,
+					"UPDATE stored_objects SET lifecycle='DELETING' WHERE object_id=? AND lifecycle='ORPHAN' AND in_flight=0",
+					blob.ID,
+				)
+				if err != nil {
+					return err
+				}
+				count, err := result.RowsAffected()
+				if err != nil {
+					return err
+				}
+				if count != 1 {
+					return fmt.Errorf("GC claim state changed")
+				}
+			}
+			// A prior attempt may already have committed DELETING before its S3
+			// request failed. Row locks and the reference check make that state a
+			// valid retry claim even though MySQL reports zero changed rows for a
+			// DELETING -> DELETING update.
+			claimed = true
+			return nil
 		})
 		if err != nil {
 			return deleted, err
