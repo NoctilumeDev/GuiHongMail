@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-parent</artifactId><version>4.1.1</version><relativePath/></parent>
+  <groupId>dev.guihong</groupId><artifactId>guihong-backend</artifactId><version>0.1.0-SNAPSHOT</version><packaging>pom</packaging>
+  <modules><module>platform-common</module><module>mailbox-service</module><module>smtp-ingress</module><module>delivery-worker</module></modules>
+  <properties><java.version>17</java.version><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding><aws.version>2.55.15</aws.version><rocketmq.version>5.5.0</rocketmq.version><guihong.source_sha>UNKNOWN</guihong.source_sha></properties>
+  <dependencyManagement><dependencies><dependency><groupId>software.amazon.awssdk</groupId><artifactId>bom</artifactId><version>${aws.version}</version><type>pom</type><scope>import</scope></dependency></dependencies></dependencyManagement>
+  <build><resources>
+    <resource><directory>src/main/resources</directory><filtering>false</filtering><excludes><exclude>foundation-source.properties</exclude></excludes></resource>
+    <resource><directory>src/main/resources</directory><filtering>true</filtering><includes><include>foundation-source.properties</include></includes></resource>
+  </resources></build>
+</project>

@@ -1,0 +1,12 @@
+{
+  "schema": "GuiHongEnvironmentLock/1.0",
+  "profile": "windows-java17-docker-linux-amd64",
+  "images": {
+    "mysql": {"version": "8.4.10", "image": "mysql@sha256:870634c634aae968ea1a93e5c094a14e00c692da2ee9bed956b3dfcc7bd08cb0", "index_digest": "sha256:8dbcf531a03aade657e181b9cf2f1d1803ce621a1d55610cb44cb531ab7d7db6"},
+    "seaweedfs": {"version": "4.48", "image": "chrislusf/seaweedfs@sha256:aba492e2a4e4c90bff795745e8e660affa1f09e7650f5981bd7bccd1a06cd931", "index_digest": "sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"},
+    "rocketmq": {"version": "5.5.0", "image": "apache/rocketmq@sha256:a613f1341f3404b96900cf11e5c35f2d049c103504a1dd60242a04cebf5be467", "index_digest": "sha256:7e8f6c9dbd9df742ed26ba69c00d4ad69e2f86a56f3ca7782ff8144dd0798132"}
+  },
+  "build": {"java_release": 17, "spring_boot": "4.1.1", "aws_sdk": "2.55.15", "subethasmtp": "7.2.2", "angus_mail": "2.0.5", "rocketmq_client": "5.5.0", "node_observed": "24.14.0", "maven_observed": "3.9.11", "python_observed": "3.10.6"},
+  "collector": {"boto3": "1.43.112", "pymysql": "1.2.3", "veritrail": "0.13.0", "veritrail_wheel_sha256": "95cb00c08fa4a29c21c798c7ca5a8200bb83f71cd11b31b1dea01c19ec5a8a04"},
+  "selection_notes": ["RocketMQ 5.5.1 is published as a Java release but its official Docker tag was absent during selection; select the verified stable 5.5.0 server/client pair before qualification.", "MySQL 8.4.10 LTS is project-local; the existing Windows MySQL 8.0.44 service is unrelated.", "No image or interface qualification follows merely from this lock. Actual startup and probes remain mandatory."]
+}

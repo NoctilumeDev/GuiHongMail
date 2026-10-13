@@ -1,0 +1,31 @@
+# 连续运行账册
+
+| 时间（UTC） | 事实 |
+| --- | --- |
+| 2026-10-13T04:06:43.7320975Z | M1 第一施工动作：从 main `da2ab376c1c84b0b487e3c33b5baafece320b105` 创建独立 worktree / `build/m1-foundation`；尚无运行时资格 |
+| 2026-10-13T04:07:01.8879332Z | 首次 Docker Desktop 启动在 sailor-ingest.sock rename 处失败，归类 ENVIRONMENT_PREFLIGHT_FAILURE；保留本地最小原始日志，不是归鸿构建失败 |
+| 2026-10-13T04:12:22.9074307Z | 正常 stop 超时，受支持的 force stop 成功且核对进程清空；从桌面 shell 单次冷启动，未改 socket 目录、数据盘、代理或 Docker 配置 |
+| 2026-10-13T04:13:01.9401646Z | 真实 daemon 恢复，Server 29.7.2；既有 8 个其他项目容器全处于退出状态，未更改它们 |
+| 2026-10-13T04:14:30.1286495Z | 现有 hello-world 镜像按本地 ID 创建项目具名探针，运行退出并自动清理；只证明已有镜像的创建/执行/清理，未证明网络拉取或根治 |
+| 2026-10-13T04:16:10.2587131Z | 人工介入 1：用户报告关闭浏览器；之后实测空闲 7.22 GiB，Docker 仍可访问。人工操作实际起止和时长 UNKNOWN，不推算 |
+| 2026-10-13T04:32:10.3087611Z | 首次 lab 启动日志持久化：source `4209bbc8ff52123b7f70dcbab595f8d24dee53d1`；资源归属检查将小写 `no such volume` 当作未知，启动前停止，容器尚未创建。TOOL_SETUP_FAILURE；原 `storage-startup-first.log` 保留，修复仅规范化具名不存在错误 |
+| 2026-10-13T04:34:16.129340Z | 首次 A04 source `fd11bfb94ba19710dacf9c46d9e4cfb67a91e408`，运行 `guihong-s3-0cec27b7e33a4b5db5520293105f9a5f`，ERROR / PENDING。CRUD、18 次拒绝等源事实已收；重启后探针只等 TCP，认证 GET 遇连接关闭，未取得持久化证据。COLLECTOR_READINESS_ERROR，原 Plan/Evidence/Bundle/对象保留，按原断言修复就绪等待再验 |
+| 2026-10-13T04:45:08Z | Broker 首次启动 source `0833982`：Exit 253 / OOM false；新项目卷 root 目录不允许镜像 UID 3000 创建 store/config/commitlog。DEPLOYMENT_PERMISSION_FAILURE；日志原件在 ignored lab/broker-first-logs 保存；修复仅增加有 owner、无网络、64 MiB 的一次性根目录 chown 初始化，不递归改写卷内数据 |
+| 2026-10-13T04:51:07Z | 卷权限修复后 Broker 在 TimerWheel 初始化遇 Java Direct buffer memory，Exit 255；Docker OOM false。保留 after-volume-init 日志。此 profile 不使用 MQ 定时消息；配置禁用默认 timerWheel，不增加 512 MiB 容器上限或直接内存上限，也不改 SYNC_FLUSH、普通持久队列及 Delivery 自有有限重试义务 |
+| 2026-10-13T04:56:04Z | 禁用 TimerWheel 后 Broker 的 ScheduleMessageService 启动遇 native thread 创建失败；Docker OOM false，根因未进一步归为全机内存故障。原 after-timer-profile 日志保留；多个默认线程池固定为 18/32，当前单机 profile 将具名线程池收束到 1/2，PID 128 与内存 512 MiB 上限保持 |
+| 2026-10-13T05:03:55Z | 有界线程池配置已实际加载，Broker 仍 Exit 255 / OOM false；首败与 after-thread-profile 日志保留，不能宣称 MQ 可用 |
+| 2026-10-13T05:50:03Z | 首次编译准备在 PowerShell 参数解析处失败，尚未执行 Java 编译；原 first-compiler-setup.log 保留。后续以独立参数传入 Maven 仓库路径，不改全局配置 |
+| 2026-10-13T05:56:56Z | 原配置复现仍 Exit 255；退出前采样 263.8 MiB / 512 MiB、63 PIDs，但未捕获失败瞬间峰值。官方 5.5.0 ScheduleMessageService 按 delay level 启动线程，单机 profile 把默认 18 级收束到 3 级（1s/5s/10s），不提供用户定时发送、不改变 Delivery 重试义务；所有硬上限保持 |
+| 2026-10-13T06:11:23Z | source `9b7be12651ac5584de9ae1fc69aadbbff16f6918` 三模块编译成功；Broker 日志改为保留全部 INFO 的同步单出口后实际约 100 PIDs / 280 MiB，随后三服务真实启动、schema V1 迁移、三依赖就绪和正常退出。开发观察尚未封存正式 Plan，不宣称子门资格 |
+| 2026-10-13T06:26:44Z | source `4b84250969bc8ae811cfa8a6a604dd4a0c3676d7` 第一 foundation 运行 `guihong-foundation-f0c1dbe22e5e4a7bb9c66a4aa8066081` ERROR / PENDING；Mailbox 在启动时因 final Repository 不允许 Spring 异常转换代理退出，启动器随后遇退出进程的路径读取竞态。原应用日志与 Plan/Evidence/Bundle 保留；schema V2 已执行并有库外完成记录，后续不重置数据库 |
+| 2026-10-13T06:29:12Z | source `c826ae73b3d38bf7653fa2a3f0d6f47a70d9d805` foundation `guihong-foundation-cddc2405f0d24d668e5374d3dafdb43c` ERROR / PENDING；MQ 收发原生断言完成后 topic 清理 CODE 1。服务端与官方源码确认 disabled TimerWheel 被无条件引用，保留 native/broker 首败，按组件 1.1 重分配原 JVM 内存预算并撤销不兼容 workaround |
+| 2026-10-13T06:38:44Z | source `8f17555bf6613f8cb6c76220901f1bb703a2b95f` foundation `guihong-foundation-58a7736ac2bf4230afa6d34bccfd86cf` COMPLETED / PENDING；真实 MQ 收发与精确清理成功，Broker 约 304 MiB / 118 PIDs。Core 隐私层把名为 cookie / wrong_password 的非敏感状态投影整体遮蔽，5 条原断言无法读取。保留 PENDING；normalization 1.1 只保留非秘密 HTTP 事实并用中性投影名，原值预期及密码/Cookie 隐私规则不降低 |
+| 2026-10-13T06:57Z | source `478a37c8cfb61e8521ae071a16c4fe57291a3e92` 对象生命周期候选编译成功；第一次应用开发启动在脚本的重复 4 GiB 准入检查处停止，尚未创建应用进程。合同只要求完整实验启动前一次 4 GiB 准入，运行中使用 14 GiB 三次采样及 384 MiB/app 停止线；移除重复检查但不降低任何冻结资源边界 |
+| 2026-10-13T08:16:31Z | source `dd22d90f8ba29322e9ec63e9a60e5bba6dfc79fd` 对象运行 `guihong-objects-4cf62f85414a4a2c9c655dd30f6f2d49` ERROR / FAIL；Mailbox、Ingress 正向对象链完成，已证 PUT 拒绝、成功 PUT 后数据库回滚、GC 删除失败后的 `DELETING` 重入。Delivery 与后续 unknown PUT 被 SeaweedFS 4.48 以 `payload checksum does not match` 拒绝，分别保持 STAGED/in_flight；采集器随后因 `rollback` / `known_rollback` 事实键错误退出。原 Plan/Evidence/Bundle、服务端日志、应用读回体和未决对象全部保留；修复只关闭 S3 协议未要求的 SDK 可选校验、保留零重试与应用哈希读回，并令采集器在依赖步骤失败时立即停止 |
+| 2026-10-13T08:27:02Z | source `ea5fc8196d949d8803bd5e29cfda24be7c22c251` 对象运行 `guihong-objects-a7371addff8d4922bccef6b7848cb785` COMPLETED / FAIL；三服务 PUT/GET/hash/ref/deref、连接拒绝、回滚孤儿、5 对象有界 GC、删除重入、引用完整性阻断、日志缺失/恢复均通过。仅 COMMIT 响应故障未触发：数据库与引用确已提交，但 HTTP 200、日志 C、readiness 200；代理 arm 未变为 fired。保留完整 FAIL；下一候选只增加 arm 后 MySQL 命令的长度/摘要/命令号/16 字节前缀诊断并在该先决条件失败时停止，绝不记录 SQL 值、凭据或放宽 U/503/阻断断言 |
+| 2026-10-13T08:31:05Z | source `4a5fc219749d6caeb9b550142b5fdcaffdd324d3` 对象诊断运行 `guihong-objects-ebcd2e3a86a348b4824ae175758117c8` ERROR / FAIL，按新增先决检查在 COMMIT 注入未发生后立即停止。包证据确认 Connector/J 9.7 的提交帧为命令 3、查询属性前缀 `00 01`、随后才是 COMMIT；传统帧解析因此未匹配。原诊断保留；修复精确支持已观察的零参数/单参数集帧，后续诊断只记录该帧布尔值、命令号、长度与摘要，不再保留查询前缀 |
+| 2026-10-13T08:37:50Z | source `cae1baf8d2e4e45a4f8aa21a87e4da60acfabc47` 对象运行 `guihong-objects-4c0451738e5346c1bbc9fee917a3db0b` COMPLETED / FAIL；COMMIT 请求已上游提交、响应被精确丢弃，应用得到 503、写 U 并阻断，重启凭 receipt 对账为 LIVE/1 ref，最终 dereference + GC + S3 404 完成。唯一失败断言把“当前引用对象不可删除”误写成“整批 GC 不得删除任何对象”；实际返回的 3 个 ID 均是早先失败运行的无引用孤儿，当前受保护 ID 不在集合。原 FAIL 保留；下一候选直接断言当前 ID 不在删除集，另记正常恢复的旧夹具数量 |
+| 2026-10-13T08:43:15Z | source `51de444a07dbbc0d5be227943b7b5f8a87fa35f4` 对象运行 `guihong-objects-ca75c8ed2afe4fe0b936c04507f0e3c0` COMPLETED / PASS；A05 子门全部硬断言成立，当前引用对象未被 GC，确定孤儿恰好回收 5 个，UNKNOWN 经 U/503/NOT_RECONCILED 后凭 receipt 恢复，损坏对象与缺日志均阻断，最终当前 unknown 夹具已 dereference、GC 为 DELETED 且 S3 404。此 PASS 只授予 exact source 的 A05 子门，不代替 M1 聚合、保护合入或 exact-main |
+| 2026-10-13T08:47:37.6831875Z | M1 公开静态门候选补齐：`scripts/check.py all` 现在有限检查四模块/三独立迁移、domain/application 依赖方向、跨服务源码引用、凭据特征、所有宿主发布端口与三应用 loopback、错误隐藏、会话 Cookie 标志及 S3 零自动重试；GitHub CI 增加 Java 17 全量 Maven verify 与 MySQL 查询属性 COMMIT 帧单元测试。当前本地静态门通过；尚未取得 PR/CI/main 资格 |
+
+环境可用窗口已恢复，首败不会被后续成功覆盖。主页参考文档按当前中文主线 `NoctilumeDev/NoctilumeDev-ZH@5fe4cddc76d883476d004147fcddfaa24ac06` 阅读；同名本地 profile 分支包含更晚的未合入补充，不把它当已发布事实。M6 结束时间、墙钟时长与 Release 身份尚不存在。

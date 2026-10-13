@@ -17,6 +17,8 @@ artifacts/local/
 **/.gradle/
 **/.idea/
 **/.vscode/
+**/__pycache__/
+*.pyc
 *.log
 *.eml
 *.mbox
