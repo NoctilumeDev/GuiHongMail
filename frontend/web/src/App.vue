@@ -56,7 +56,11 @@ async function signOut(): Promise<void> {
   clearFeedback(); try { await api.logout() } catch (failure) { fail(failure) }
   user.value = null; selected.value = null; editing.value = null; messages.value = []; drafts.value = []; mobileStep.value = 'folders'
 }
-async function enterMailbox(): Promise<void> { await refreshSidebar(); await openFolder('INBOX', false) }
+async function enterMailbox(): Promise<void> {
+  await refreshSidebar()
+  if (isMobile.value) { history.replaceState({ step: 'folders' }, '', location.href); await openFolder('INBOX', true) }
+  else await openFolder('INBOX', false)
+}
 async function refreshSidebar(): Promise<void> {
   const [nextCounts, nextCategories] = await Promise.all([api.folders(), api.categories()]); counts.value = nextCounts; categories.value = nextCategories
 }
