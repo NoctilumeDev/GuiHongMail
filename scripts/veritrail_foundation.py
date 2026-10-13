@@ -9,8 +9,6 @@ import smtplib
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 import uuid
 import pymysql
 from veritrail.acceptance_plan import observation_spec_digest,seal_acceptance_plan
@@ -25,7 +23,7 @@ def save(path,value):lab.write_new(path,json.dumps(value,ensure_ascii=False,inde
 
 def main():
     if git('status','--porcelain') or version('veritrail')!='0.13.0':raise RuntimeError('Clean exact source and public locked Core required')
-    source=git('rev-parse','HEAD');run='guihong-foundation-'+uuid.uuid4().hex;out=ROOT/'artifacts/local'/run;out.mkdir(parents=True)
+    source=git('rev-parse','HEAD');run='guihong-foundation-'+uuid.uuid4().hex;out=lab.local_run(run,create=True)
     expected={'source_sha':source,'lab_id':lab.load()['id'],'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),
         'contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),'mq_topic':lab.load()['id'].replace('-','_')+'_probe_'+uuid.uuid4().hex[:12],
         'jars':{r:sha((ROOT/'backend'/apps.MODULES[r]/'target'/(apps.MODULES[r]+'-0.1.0-SNAPSHOT.jar')).read_bytes()) for r in lab.SERVICES}}
@@ -43,7 +41,7 @@ def main():
     for i in range(12):assertions.append(hard('cross-db-'+str(i),'cross_database/'+str(i)+'/error_code',1142))
     for name,code in {'alice_login':200,'bob_login':200,'invalid_login':401,'unknown_account':401,'alice_me':200,'alice_reads_bob':404,
         'cookie_internal':401,'origin_login':403,'csrf_refresh':403,'refresh':200,'old_after_refresh':401,'logout':204,'after_logout':401,
-        'bob_disabled':401,'rate_limit':429,'drained_login':503}.items():assertions.append(hard('http-'+name,'sessions/'+name+'/http',code))
+        'bob_disabled':401,'rate_limit':429,'correct_after_rate_limit':200,'drained_login':503}.items():assertions.append(hard('http-'+name,'sessions/'+name+'/http',code))
     assertions+=[hard('uniform-login-feedback','sessions/invalid_login/body',{'code':'AUTHENTICATION_FAILED'}),hard('uniform-unknown-feedback','sessions/unknown_account/body',{'code':'AUTHENTICATION_FAILED'}),
         hard('http-only','session_attributes/httponly',True),hard('same-site','session_attributes/samesite','Strict'),hard('cookie-path','session_attributes/path','/api'),
         hard('external-relay','smtp/external_rcpt',550),hard('no-false-accept','smtp/local_rcpt',451),hard('no-data-responsibility','smtp/data',503),
@@ -69,13 +67,11 @@ def main():
         if origin is not None:headers['Origin']=origin
         if cookie:headers['Cookie']=cookie
         if csrf:headers['X-GuiHong-CSRF']=csrf
-        if internal:headers.update({'X-GuiHong-Service':'lab','Authorization':'Bearer '+('wrong-token' if wrong_token else credentials['internal'][role])})
+        if internal and wrong_token:headers.update({'X-GuiHong-Service':'lab','Authorization':'Bearer wrong-token'})
         data=None if body is None else json.dumps(body).encode()
-        req=urllib.request.Request(f'http://127.0.0.1:{apps.PORTS[role]}'+path,data=data,headers=headers,method=method)
-        try:response=urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req,timeout=10)
-        except urllib.error.HTTPError as error:response=error
-        with response:
-            raw=response.read(1048577);value=json.loads(raw) if raw else None;status=response.code;set_cookie=response.headers.get('Set-Cookie')
+        status,response_headers,raw=apps.owned_http(role,path,method=method,body=data,headers=headers,
+            internal=internal and not wrong_token,max_bytes=1048577)
+        value=json.loads(raw) if raw else None;set_cookie=response_headers.get('Set-Cookie')
         public=value
         if isinstance(public,dict):
             # Only public protocol observations, never nonce values or address material.
@@ -124,7 +120,8 @@ def main():
         bob_id=account_ids['bob'];sessions={};facts['sessions']=sessions
         # Keep all bounded login checks in one actual server minute. No manufactured client identity.
         with pymysql.connect(host='127.0.0.1',port=13306,user=db['user'],password=db['password'],database=db['schema']) as c:
-            with c.cursor() as q:q.execute('SELECT minute_window,attempts FROM login_buckets WHERE bucket_hash=%s',(sha(b'127.0.0.1'),));bucket=q.fetchone()
+            login_bucket=sha(('127.0.0.1|'+credentials['accounts']['alice']['address']).encode())
+            with c.cursor() as q:q.execute('SELECT minute_window,attempts FROM login_buckets WHERE bucket_hash=%s',(login_bucket,));bucket=q.fetchone()
         if time.time()%60>35 or (bucket and bucket[0]==int(time.time()/60) and bucket[1]>0):time.sleep(60-time.time()%60+.1)
         cookies={};csrf={}
         for name in ('alice','bob'):
@@ -146,8 +143,9 @@ def main():
         call('mailbox','/internal/accounts/'+bob_id+'/enabled','POST',{'enabled':False},internal=True)
         sessions['bob_disabled']=call('mailbox','/api/auth/me',cookie=cookies['bob'])[0]
         call('mailbox','/internal/accounts/'+bob_id+'/enabled','POST',{'enabled':True},internal=True);bob_id=None
-        call('mailbox','/api/auth/login','POST',{'address':'absent@guihong.test','password':'wrong-synthetic-password'})
-        sessions['rate_limit']=call('mailbox','/api/auth/login','POST',{'address':'absent@guihong.test','password':'wrong-synthetic-password'})[0]
+        for _ in range(4):call('mailbox','/api/auth/login','POST',{'address':credentials['accounts']['alice']['address'],'password':'wrong-synthetic-password'})
+        sessions['rate_limit']=call('mailbox','/api/auth/login','POST',{'address':credentials['accounts']['alice']['address'],'password':'wrong-synthetic-password'})[0]
+        sessions['correct_after_rate_limit']=call('mailbox','/api/auth/login','POST',credentials['accounts']['alice'])[0]
         facts['smtp']={}
         with smtplib.SMTP('127.0.0.1',12525,timeout=10) as smtp:
             smtp.ehlo();facts['smtp']['mail']=smtp.mail('sender@outside.test')[0]

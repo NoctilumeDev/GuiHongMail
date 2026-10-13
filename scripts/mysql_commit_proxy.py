@@ -4,10 +4,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import selectors
 import socket
 import threading
-import time
 import uuid
 import lab
 
@@ -20,10 +18,29 @@ def is_commit_query(payload):
 
 class Proxy:
     def __init__(self,port,root):
-        self.port=port;self.root=root;self.stop=threading.Event();self.threads=[]
+        self.port=port;self.root=root;self.stop=threading.Event();self.threads=set();self.thread_lock=threading.Lock();self.arm_lock=threading.Lock()
         self.owner=lab.load()['id'];self.root.mkdir(parents=True,exist_ok=False)
         lab.write_new(root/'identity.json',json.dumps({'lab_id':self.owner,'listen':f'127.0.0.1:{port}','upstream':'127.0.0.1:13306'},indent=2)+'\n')
     def record(self,name,value):lab.write_new(self.root/(name+'-'+uuid.uuid4().hex+'.json'),json.dumps(value,indent=2)+'\n')
+    def forward(self,upstream,packet,payload):
+        commit=is_commit_query(payload);arm=self.root/'arm'
+        if not commit:
+            if arm.is_file():
+                self.record('armed-command',{'bytes':len(packet),'sha256':hashlib.sha256(packet).hexdigest(),
+                    'command':payload[0] if payload else None,'query_attributes_frame':len(payload)>=3 and payload[0]==3 and payload[1:3]==b'\x00\x01','simple_commit_match':False})
+            upstream.sendall(packet);return False
+        with self.arm_lock:
+            if not arm.is_file():upstream.sendall(packet);return False
+            claim=self.root/'arm.claimed';os.replace(arm,claim)
+            try:
+                self.record('armed-command',{'bytes':len(packet),'sha256':hashlib.sha256(packet).hexdigest(),
+                    'command':payload[0] if payload else None,'query_attributes_frame':len(payload)>=3 and payload[0]==3 and payload[1:3]==b'\x00\x01','simple_commit_match':True})
+                upstream.sendall(packet);os.replace(claim,self.root/'fired')
+            except Exception:
+                if claim.exists() and not arm.exists():os.replace(claim,arm)
+                raise
+            self.record('commit-request',{'bytes':len(packet),'sha256':hashlib.sha256(packet).hexdigest(),'forwarded_upstream':True})
+            return True
     def client(self,downstream):
         upstream=socket.create_connection(('127.0.0.1',13306),timeout=5);downstream.settimeout(None);upstream.settimeout(None)
         fired=False
@@ -49,18 +66,8 @@ class Proxy:
                     if len(buffer)<length+4:break
                     packet,buffer=buffer[:length+4],buffer[length+4:]
                     payload=packet[4:]
-                    armed=(self.root/'arm').is_file()
-                    commit=is_commit_query(payload)
-                    if armed:
-                        self.record('armed-command',{'bytes':len(packet),'sha256':hashlib.sha256(packet).hexdigest(),
-                            'command':payload[0] if payload else None,
-                            'query_attributes_frame':len(payload)>=3 and payload[0]==3 and payload[1:3]==b'\x00\x01',
-                            'simple_commit_match':commit})
-                    upstream.sendall(packet)
-                    if armed and commit:
+                    if self.forward(upstream,packet,payload):
                         fired=True
-                        os.replace(self.root/'arm',self.root/'fired')
-                        self.record('commit-request',{'bytes':len(packet),'sha256':hashlib.sha256(packet).hexdigest(),'forwarded_upstream':True})
                         try:downstream.shutdown(socket.SHUT_RDWR)
                         except OSError:pass
                         downstream.close();reader.join(10);return
@@ -76,8 +83,12 @@ class Proxy:
             while not (self.root/'stop').exists():
                 try:client,_=listener.accept()
                 except socket.timeout:continue
-                thread=threading.Thread(target=self.client,args=(client,),daemon=True);thread.start();self.threads.append(thread)
-        for thread in self.threads:thread.join(10)
+                with self.thread_lock:
+                    self.threads={thread for thread in self.threads if thread.is_alive()}
+                    if len(self.threads)>=8:client.close();continue
+                    thread=threading.Thread(target=self.client,args=(client,),daemon=True);self.threads.add(thread);thread.start()
+        with self.thread_lock:threads=list(self.threads)
+        for thread in threads:thread.join(10)
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,required=True);parser.add_argument('--root',type=Path,required=True);args=parser.parse_args()

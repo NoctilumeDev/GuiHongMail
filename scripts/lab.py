@@ -8,6 +8,7 @@ import re
 import secrets
 import shutil
 import socket
+import stat
 import subprocess
 import sys
 import uuid
@@ -15,6 +16,28 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 LAB = ROOT / '.artifacts' / 'lab'
 SERVICES = ('mailbox', 'ingress', 'delivery')
+
+def _ordinary_directory(path,parent):
+    if not path.is_dir() or path.is_symlink():raise RuntimeError('Artifact directory is missing or linked: '+str(path))
+    attributes=getattr(path.lstat(),'st_file_attributes',0)
+    if attributes & getattr(stat,'FILE_ATTRIBUTE_REPARSE_POINT',0):
+        raise RuntimeError('Artifact directory is a reparse point: '+str(path))
+    resolved=path.resolve();expected_parent=parent.resolve()
+    if resolved.parent!=expected_parent:raise RuntimeError('Artifact directory escaped its owned parent')
+    return resolved
+
+def local_run(identity,create=False):
+    if re.fullmatch(r'guihong-[a-z0-9-]{1,100}',identity) is None:raise RuntimeError('Invalid local run identity')
+    artifacts=ROOT/'artifacts';_ordinary_directory(artifacts,ROOT)
+    local=artifacts/'local'
+    try:local.mkdir()
+    except FileExistsError:pass
+    local_root=_ordinary_directory(local,artifacts)
+    run=local/identity
+    if create:run.mkdir(exist_ok=False)
+    resolved=_ordinary_directory(run,local)
+    if resolved.parent!=local_root:raise RuntimeError('Local run escaped the ignored artifact root')
+    return run
 
 def docker():
     found = shutil.which('docker')

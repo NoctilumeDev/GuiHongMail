@@ -20,10 +20,13 @@ public final class IdentityService {
     private String token(){byte[] bytes=new byte[32];random.nextBytes(bytes);return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);}
     public Session login(String address,String password,String client){
         available();if(address==null || password==null || address.length()>254 || password.getBytes(StandardCharsets.UTF_8).length>72)throw new IllegalArgumentException("AUTHENTICATION_FAILED");
-        if(repository.loginAttempt(Hashes.sha256(client),System.currentTimeMillis()/60000)>5)throw new IllegalArgumentException("RATE_LIMITED");
-        Account account=repository.byAddress(address.toLowerCase(Locale.ROOT));
+        String normalized=address.toLowerCase(Locale.ROOT);Account account=repository.byAddress(normalized);
         boolean matches=passwords.matches(password,account==null?dummy:account.password());
-        if(account==null || !matches || !account.enabled())throw new IllegalArgumentException("AUTHENTICATION_FAILED");
+        if(account==null || !matches || !account.enabled()){
+            if(repository.failedLoginAttempt(Hashes.sha256(client+"|"+normalized),System.currentTimeMillis()/60000)>5)
+                throw new IllegalArgumentException("RATE_LIMITED");
+            throw new IllegalArgumentException("AUTHENTICATION_FAILED");
+        }
         return createSession(account,null);
     }
     private Session createSession(Account a,String oldHash){

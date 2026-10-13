@@ -10,8 +10,6 @@ import socket
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 import uuid
 import boto3
 from botocore.config import Config
@@ -38,7 +36,7 @@ def wait_port(port,up=True,seconds=30):
 
 def main():
     if git('status','--porcelain') or version('veritrail')!='0.13.0' or version('boto3')!='1.43.112':raise RuntimeError('Clean exact source and locked public dependencies required')
-    source=git('rev-parse','HEAD');run='guihong-objects-'+uuid.uuid4().hex;out=ROOT/'artifacts/local'/run;out.mkdir(parents=True)
+    source=git('rev-parse','HEAD');run='guihong-objects-'+uuid.uuid4().hex;out=lab.local_run(run,create=True)
     request={'source_sha':source,'lab_id':lab.load()['id'],'contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),
         'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),'proxy_port':23306,
         'object_ids':{name:str(uuid.uuid4()) for name in ['mailbox','ingress','delivery','put_failure','rollback','unknown']}}
@@ -53,7 +51,9 @@ def main():
             hard(role+'-deref','positive/'+role+'/dereference_http',204),hard(role+'-gc','positive/'+role+'/database_state','DELETED'),hard(role+'-absent','positive/'+role+'/s3_after_gc',404)]
     assertions += [hard('put-failed-http','put_failure/http',503),hard('put-failed-orphan','put_failure/database_state','ORPHAN'),hard('put-failed-no-object','put_failure/s3_http',404),
         hard('rollback-http','known_rollback/http',503),hard('rollback-orphan','known_rollback/database_state','ORPHAN'),hard('rollback-object-retained','known_rollback/s3_http',200),hard('rollback-zero-ref','known_rollback/ref_count',0),
-        hard('unknown-http','commit_unknown/http',503),hard('unknown-journal','commit_unknown/journal_outcome','U'),hard('unknown-db-object','commit_unknown/database_state','LIVE'),hard('unknown-db-ref','commit_unknown/ref_count',1),hard('unknown-s3','commit_unknown/s3_http',200),hard('unknown-blocks','commit_unknown/readiness_after/http',503),
+        hard('unknown-http','commit_unknown/http',503),hard('unknown-journal','commit_unknown/journal_outcome','U'),hard('unknown-journal-count','commit_unknown/journal_new_records',2),
+        hard('unknown-journal-binding','commit_unknown/journal_transaction_bound',True),hard('unknown-database-binding','commit_unknown/database_receipt_bound',True),
+        hard('unknown-db-object','commit_unknown/database_state','LIVE'),hard('unknown-db-ref','commit_unknown/ref_count',1),hard('unknown-s3','commit_unknown/s3_http',200),hard('unknown-blocks','commit_unknown/readiness_after/http',503),
         hard('unknown-reconciles','commit_unknown/readiness_restart/http',200),hard('unknown-read','commit_unknown/read_after_restart_sha256',sha(('unknown|'+run+'|归鸿对象').encode())),hard('unknown-gc-protected','commit_unknown/current_object_protected',True),
         hard('gc-failure','gc/failure_http',503),hard('gc-deleting','gc/state_after_failure','DELETING'),hard('gc-retry','gc/retry_http',200),hard('gc-bounded','gc/deleted_count',5),
         hard('corrupt-read','integrity/read_http',503),hard('corrupt-block','integrity/readiness_after/http',503),hard('corrupt-restore','integrity/readiness_restart/http',200),
@@ -75,13 +75,11 @@ def main():
     def event(value):
         with events.open('a',encoding='utf-8',newline='\n') as f:f.write(json.dumps({'time':datetime.now(timezone.utc).isoformat(),**value},ensure_ascii=False)+'\n');f.flush();os.fsync(f.fileno())
     def call(role,path,method='GET',body=None,timeout=15):
-        headers={'X-GuiHong-Service':'lab','Authorization':'Bearer '+credentials['internal'][role],'Content-Type':'application/json'}
+        headers={'Content-Type':'application/json'}
         data=None if body is None else json.dumps(body).encode()
-        req=urllib.request.Request(f'http://127.0.0.1:{apps.PORTS[role]}'+path,data=data,headers=headers,method=method)
-        try:response=urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req,timeout=timeout)
-        except urllib.error.HTTPError as error:response=error
-        with response:
-            raw=response.read(6*1024*1024);status=response.code;kind=response.headers.get_content_type()
+        status,response_headers,raw=apps.owned_http(role,path,method=method,body=data,headers=headers,
+            internal=True,max_bytes=6*1024*1024)
+        kind=response_headers.get_content_type()
         value=json.loads(raw) if raw and kind=='application/json' else None
         result={'http':status,'bytes':len(raw),'sha256':sha(raw)}
         event({'service':role,'method':method,'path':path,'result':result})
@@ -144,13 +142,27 @@ def main():
         rollback=reference('mailbox','rollback','x'*40);rollback_db=db('mailbox',request['object_ids']['rollback']);rollback_s3=s3_get('mailbox',rollback_db['object_key'],out/'rollback-retained.body')
         facts['known_rollback']={'http':rollback[0]['http'],**rollback_db,'s3_http':rollback_s3['http'],'s3_sha256':rollback_s3.get('sha256')}
         # Forward COMMIT upstream, close only the downstream response, then read DB and S3 independently.
-        unknown_payload=('unknown|'+run+'|归鸿对象').encode();require_http('commit-unknown stage',stage('mailbox','unknown',unknown_payload),200);lab.write_new(proxy_root/'arm','drop exactly one COMMIT response\n')
+        unknown_payload=('unknown|'+run+'|归鸿对象').encode();require_http('commit-unknown stage',stage('mailbox','unknown',unknown_payload),200)
+        journal_path=lab.LAB/'witness/mailbox/transactions.log';journal_before=journal_path.read_text(encoding='utf-8').splitlines()
+        expected_tx_digest=sha(('object-reference|'+request['object_ids']['unknown']+'|qualification|'+run+'|'+sha(unknown_payload)).encode())
+        lab.write_new(proxy_root/'arm','drop exactly one COMMIT response\n')
         unknown_call=reference('mailbox','unknown');unknown_db=db('mailbox',request['object_ids']['unknown']);unknown_s3=s3_get('mailbox',unknown_db['object_key'],out/'unknown-retained.body')
-        journal=(lab.LAB/'witness/mailbox/transactions.log').read_text(encoding='utf-8').splitlines();outcome=journal[-1].split('|')[2]
+        journal=journal_path.read_text(encoding='utf-8').splitlines();new_rows=[row.split('|') for row in journal[len(journal_before):]]
+        transaction_bound=(len(new_rows)==2 and all(len(row)==6 for row in new_rows)
+            and new_rows[0][1]==new_rows[1][1] and new_rows[0][0]==new_rows[1][0]
+            and [new_rows[0][2],new_rows[1][2]]==['P','U']
+            and new_rows[0][3]==expected_tx_digest==new_rows[1][3])
+        tx_id=new_rows[0][1] if transaction_bound else ''
+        with pymysql.connect(host='127.0.0.1',port=13306,user=credentials['database']['mailbox']['user'],password=credentials['database']['mailbox']['password'],database=credentials['database']['mailbox']['schema']) as connection:
+            with connection.cursor() as query:query.execute('SELECT sequence_no,payload_sha256 FROM tx_receipts WHERE tx_id=%s',(tx_id,));receipt=query.fetchone()
+        database_bound=bool(receipt and str(receipt[0])==new_rows[0][0] and receipt[1]==expected_tx_digest) if transaction_bound else False
+        outcome=new_rows[1][2] if transaction_bound else 'UNBOUND'
         readiness_after=call('mailbox','/health/ready')[0]
-        facts['commit_unknown']={'http':unknown_call[0]['http'],'journal_outcome':outcome,**unknown_db,'s3_http':unknown_s3['http'],'s3_sha256':unknown_s3.get('sha256'),'readiness_after':readiness_after}
+        facts['commit_unknown']={'http':unknown_call[0]['http'],'journal_outcome':outcome,'journal_new_records':len(new_rows),
+            'journal_transaction_bound':transaction_bound,'database_receipt_bound':database_bound,'transaction_id_sha256':sha(tx_id.encode()) if tx_id else None,
+            **unknown_db,'s3_http':unknown_s3['http'],'s3_sha256':unknown_s3.get('sha256'),'readiness_after':readiness_after}
         require_http('commit-unknown reference',unknown_call,503)
-        if outcome!='U':raise RuntimeError('Commit-unknown witness outcome was '+outcome+', expected U')
+        if outcome!='U' or not transaction_bound or not database_bound:raise RuntimeError('Commit-unknown witness did not bind the exact transaction')
         apps.stop();mailbox_running=False
         lab.write_new(proxy_root/'stop','normal exact proxy stop\n');proxy.wait(10)
         apps.start();mailbox_running=True
@@ -212,8 +224,8 @@ def main():
     facts['source_sha']=git('rev-parse','HEAD');facts['source_clean']=not bool(git('status','--porcelain'));save(out/'facts.json',facts)
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],'observation_spec_digest':observation_spec_digest(spec),
         'request_seal_digest':sha256_json(request),'collection_session_id':run,'collector_role':'guihong-objects-collector','coverage':'COMPLETE' if status=='COMPLETED' else 'ERROR',
-        'normalization_semantics_version':'guihong-objects/1.0','facts_digest':sha256_json(facts)}
-    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-objects/1.0','captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
+        'normalization_semantics_version':'guihong-objects/1.1','facts_digest':sha256_json(facts)}
+    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-objects/1.1','captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
     save(out/'evidence.json',evidence)
     report=create_acceptance_bundle(plan=plan,evidence_paths=[out/'evidence.json'],output=out/'bundle',acceptance_id=run,execution_status=status)
     summary={'run_id':run,'source_sha':source,'execution':status,'verdict':report['verdict'],'boundary':facts['boundary'],'bundle':str(out/'bundle')};save(out/'summary.json',summary);print(json.dumps(summary))

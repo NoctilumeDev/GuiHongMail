@@ -2,7 +2,7 @@ package dev.guihong.mailbox.domain;
 public interface IdentityRepository {
     record Account(String id,String address,String name,String password,boolean enabled,long epoch,String role) {}
     boolean available();
-    int loginAttempt(String clientHash,long minute);
+    int failedLoginAttempt(String bucketHash,long minute);
     Account byAddress(String address);
     Account byId(String id);
     Principal authenticate(String tokenHash);

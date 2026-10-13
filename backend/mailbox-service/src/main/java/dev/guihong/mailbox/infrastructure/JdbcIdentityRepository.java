@@ -18,7 +18,7 @@ public class JdbcIdentityRepository implements IdentityRepository {
     public JdbcIdentityRepository(JdbcTemplate jdbc,WitnessGate witness,FoundationController foundation){this.jdbc=jdbc;this.witness=witness;this.foundation=foundation;}
     public boolean available(){return foundation.writable();}
     private void writable(){if(!available())throw new IllegalStateException("SERVICE_UNAVAILABLE");}
-    public int loginAttempt(String bucket,long minute){
+    public int failedLoginAttempt(String bucket,long minute){
         writable();return witness.write("login-budget|"+bucket+"|"+minute,c->{
             try(var q=c.prepareStatement("INSERT INTO login_buckets(bucket_hash,minute_window,attempts) VALUES(?,?,1) ON DUPLICATE KEY UPDATE attempts=IF(minute_window=?,attempts+1,1),minute_window=?")){q.setString(1,bucket);q.setLong(2,minute);q.setLong(3,minute);q.setLong(4,minute);q.executeUpdate();}
             try(var q=c.prepareStatement("SELECT attempts FROM login_buckets WHERE bucket_hash=?")){q.setString(1,bucket);try(var rows=q.executeQuery()){rows.next();return rows.getInt(1);}}

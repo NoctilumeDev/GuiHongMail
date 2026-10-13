@@ -2,13 +2,13 @@
 import argparse
 import ctypes
 import hashlib
+import http.client
 import json
 import os
 from pathlib import Path
 import socket
 import subprocess
 import time
-import urllib.request
 import uuid
 import lab
 
@@ -17,6 +17,10 @@ MVN = Path('D:/Maven/apache-maven-3.9.11-bin/apache-maven-3.9.11/bin/mvn.cmd')
 PORTS = {'mailbox':18080,'ingress':18081,'delivery':18082}
 MODULES = {'mailbox':'mailbox-service','ingress':'smtp-ingress','delivery':'delivery-worker'}
 PROCESSES = lab.LAB/'applications'
+
+class TcpOwnerRow(ctypes.Structure):
+    _fields_=[('state',ctypes.c_ulong),('local_address',ctypes.c_ulong),('local_port',ctypes.c_ulong),
+              ('remote_address',ctypes.c_ulong),('remote_port',ctypes.c_ulong),('pid',ctypes.c_ulong)]
 
 def environment():
     env=dict(os.environ)
@@ -50,14 +54,89 @@ def process_identity(pid):
         return {'creation_ticks':values[0].value,'executable':name.value}
     finally:kernel.CloseHandle(ctypes.c_void_p(handle))
 
+def tcp_server_owners(port,client_port):
+    """Return Windows PIDs owning the accepted side of one established loopback connection."""
+    if os.name!='nt':raise RuntimeError('This pinned app profile is Windows native')
+    api=ctypes.windll.iphlpapi.GetExtendedTcpTable;size=ctypes.c_ulong(0)
+    result=api(None,ctypes.byref(size),False,socket.AF_INET,5,0) # TCP_TABLE_OWNER_PID_ALL
+    if result!=122:raise RuntimeError('Cannot size TCP ownership table')
+    buffer=ctypes.create_string_buffer(size.value)
+    result=api(buffer,ctypes.byref(size),False,socket.AF_INET,5,0)
+    if result!=0:raise RuntimeError('Cannot read TCP ownership table')
+    count=ctypes.c_ulong.from_buffer(buffer).value;base=ctypes.addressof(buffer)+ctypes.sizeof(ctypes.c_ulong)
+    owners=set()
+    for index in range(count):
+        row=TcpOwnerRow.from_address(base+index*ctypes.sizeof(TcpOwnerRow))
+        if (row.state==5 and socket.ntohs(row.local_port&0xffff)==port
+                and socket.ntohs(row.remote_port&0xffff)==client_port):
+            owners.add(row.pid)
+    return owners
+
+def owned_process(role):
+    record=PROCESSES/(role+'.json')
+    if not record.is_file():raise RuntimeError('No owned process record for '+role)
+    owned=json.loads(record.read_text(encoding='utf-8'));current=process_identity(owned['pid'])
+    if (owned.get('lab_id')!=lab.load()['id'] or owned.get('role')!=role or current is None
+            or current!={key:owned[key] for key in ('creation_ticks','executable')}
+            or Path(current['executable']).resolve()!=JAVA.resolve()):
+        raise RuntimeError('Application process ownership is not current')
+    return owned
+
+def repo_file(relative,label):
+    value=Path(relative)
+    if value.is_absolute() or '..' in value.parts:raise RuntimeError('Unsafe '+label+' path')
+    resolved=(lab.ROOT/value).resolve()
+    if not resolved.is_relative_to(lab.ROOT.resolve()) or not resolved.is_file():
+        raise RuntimeError(label+' escaped or is missing')
+    return resolved
+
+def verified_build(source):
+    receipt_path=lab.ROOT/'.artifacts/build'/('build-'+source+'.json')
+    receipt=json.loads(receipt_path.read_text(encoding='utf-8'))
+    if receipt.get('schema')!='GuiHongBuildReceipt/1.0' or receipt.get('source_sha')!=source or receipt.get('exit_code')!=0:
+        raise RuntimeError('Build receipt does not bind the exact source')
+    log=repo_file(receipt['log'],'build log')
+    if hashlib.sha256(log.read_bytes()).hexdigest()!=receipt['log_sha256']:
+        raise RuntimeError('Build log digest mismatch')
+    artifacts={}
+    for row in receipt.get('artifacts',[]):
+        module=row.get('module');path=repo_file(row.get('path',''),'build artifact')
+        expected=lab.ROOT/'backend'/str(module)/'target'/(str(module)+'-0.1.0-SNAPSHOT.jar')
+        if module in artifacts or path!=expected.resolve() or path.stat().st_size!=row.get('bytes'):
+            raise RuntimeError('Unexpected build artifact binding')
+        digest=hashlib.sha256(path.read_bytes()).hexdigest()
+        if digest!=row.get('sha256'):raise RuntimeError('Build artifact digest mismatch')
+        artifacts[module]={'path':path,'sha256':digest}
+    expected={'platform-common',*MODULES.values()}
+    if set(artifacts)!=expected:raise RuntimeError('Build receipt artifact set mismatch')
+    return receipt_path,artifacts
+
 def private():return json.loads((lab.LAB/'secrets.json').read_text())
 
+def owned_http(role,path,method='GET',body=None,headers=None,internal=False,max_bytes=1048577):
+    owned=owned_process(role);connection=http.client.HTTPConnection('127.0.0.1',PORTS[role],timeout=10)
+    try:
+        connection.connect();client_port=connection.sock.getsockname()[1];deadline=time.monotonic()+2
+        while time.monotonic()<deadline:
+            owners=tcp_server_owners(PORTS[role],client_port)
+            if owners=={owned['pid']}:break
+            if owners and owners!={owned['pid']}:raise RuntimeError('Connected listener is not the owned application')
+            time.sleep(.02)
+        else:raise RuntimeError('Cannot bind connected listener to the owned application')
+        outbound=dict(headers or {})
+        if internal:
+            # The capability is loaded and transmitted only after the already-connected server socket is PID-bound.
+            outbound.update(Authorization='Bearer '+private()['internal'][role],**{'X-GuiHong-Service':'lab'})
+        connection.request(method,path,body=body,headers=outbound)
+        response=connection.getresponse();raw=response.read(max_bytes+1)
+        if len(raw)>max_bytes:raise RuntimeError('Owned application response exceeded byte limit')
+        return response.status,response.headers,raw
+    finally:connection.close()
+
 def request(role,path,method='GET'):
-    secret=private()['internal'][role]
-    req=urllib.request.Request(f'http://127.0.0.1:{PORTS[role]}'+path,method=method,
-       headers={'Authorization':'Bearer '+secret,'X-GuiHong-Service':'lab'})
-    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(req,timeout=10) as response:
-        return json.load(response)
+    status,_,body=owned_http(role,path,method=method,internal=True)
+    if status<200 or status>=300:raise RuntimeError('Owned internal request returned HTTP '+str(status))
+    return json.loads(body)
 
 def prepare():
     import pymysql
@@ -106,10 +185,13 @@ def build():
 
 def start(database_ports=None):
     lab.assert_owned()
+    if subprocess.check_output(['git','status','--porcelain'],cwd=lab.ROOT):
+        raise RuntimeError('Application startup requires committed clean source')
     if lab.memory()['used_bytes']>14*1024**3:raise RuntimeError('Host memory stop line reached before app startup')
     database_ports=database_ports or {}
     PROCESSES.mkdir(exist_ok=True)
-    credentials=private();source=subprocess.check_output(['git','rev-parse','HEAD'],cwd=lab.ROOT,text=True).strip()
+    source=subprocess.check_output(['git','rev-parse','HEAD'],cwd=lab.ROOT,text=True).strip()
+    receipt_path,artifacts=verified_build(source);credentials=private()
     for role in lab.SERVICES:
         record=PROCESSES/(role+'.json')
         if record.exists():
@@ -118,8 +200,7 @@ def start(database_ports=None):
             record.rename(PROCESSES/(role+'-exited-'+uuid.uuid4().hex+'.json'))
         with socket.socket() as s:
             if s.connect_ex(('127.0.0.1',PORTS[role]))==0:raise RuntimeError('Unknown listener on required app port')
-        jar=lab.ROOT/'backend'/MODULES[role]/'target'/(MODULES[role]+'-0.1.0-SNAPSHOT.jar')
-        if not jar.is_file():raise RuntimeError('Exact build unavailable')
+        jar=artifacts[MODULES[role]]['path']
         db=credentials['database'][role];storage=credentials['storage'][role];env=environment()
         env.update(GUIHONG_WITNESS_ROOT=str(lab.LAB/'witness'/role),GUIHONG_INTERNAL_TOKEN=credentials['internal'][role],
             GUIHONG_DB_URL=f"jdbc:mysql://127.0.0.1:{database_ports.get(role,13306)}/{db['schema']}?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectTimeout=3000&socketTimeout=10000",
@@ -133,7 +214,7 @@ def start(database_ports=None):
         identity=process_identity(p.pid)
         if identity is None:raise RuntimeError('App exited before PID binding')
         lab.write_new(record,json.dumps({'lab_id':lab.load()['id'],'role':role,'pid':p.pid,**identity,
-            'source_sha':source,'jar':str(jar),'jar_sha256':hashlib.sha256(jar.read_bytes()).hexdigest(),'log':str(log)},indent=2)+'\n')
+            'source_sha':source,'build_receipt':str(receipt_path),'jar':str(jar),'jar_sha256':artifacts[MODULES[role]]['sha256'],'log':str(log)},indent=2)+'\n')
         until=time.monotonic()+60
         while time.monotonic()<until:
             if process_identity(p.pid)!=identity:raise RuntimeError('Application exited; original log retained')
@@ -141,7 +222,7 @@ def start(database_ports=None):
                 actual=request(role,'/internal/identity')
                 if actual['source_sha']!=source or actual['service']!=role:raise RuntimeError('Installed app/source binding mismatch')
                 print(json.dumps({'started':role,'identity':actual}));break
-            except urllib.error.URLError:time.sleep(.5)
+            except (OSError,http.client.HTTPException):time.sleep(.5)
         else:raise RuntimeError('Application did not become identifiable within 60s')
 
 def stop():

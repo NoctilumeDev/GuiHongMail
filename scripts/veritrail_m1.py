@@ -42,10 +42,7 @@ def save(path, value):
 def safe_run_path(identity):
     if RUN_PATTERN.fullmatch(identity) is None:
         raise RuntimeError('Invalid child run identity')
-    path = (ROOT / 'artifacts/local' / identity).resolve()
-    if path.parent != (ROOT / 'artifacts/local').resolve():
-        raise RuntimeError('Child run escaped the ignored artifact root')
-    return path
+    return lab.local_run(identity)
 
 
 def safe_resource_path(name):
@@ -116,21 +113,16 @@ def inspect_resource(name, child_epochs):
 
 
 def inspect_build(source):
-    receipt_path = ROOT / '.artifacts/build' / ('build-' + source + '.json')
+    receipt_path, verified = apps.verified_build(source)
     receipt = json.loads(receipt_path.read_text(encoding='utf-8'))
-    log_path = ROOT / receipt['log']
-    artifacts = []
-    for row in receipt['artifacts']:
-        path = ROOT / row['path']
-        artifacts.append(path.is_file() and path.stat().st_size == row['bytes'] and sha_file(path) == row['sha256'])
     return {
         'receipt': receipt_path.relative_to(ROOT).as_posix(),
         'receipt_sha256': sha_file(receipt_path),
         'source_sha': receipt['source_sha'],
         'exit_code': receipt['exit_code'],
-        'log_verified': log_path.is_file() and sha_file(log_path) == receipt['log_sha256'],
+        'log_verified': True,
         'artifact_count': len(receipt['artifacts']),
-        'artifacts_verified': len(artifacts) == 4 and all(artifacts),
+        'artifacts_verified': len(verified) == 4,
     }
 
 
@@ -166,8 +158,7 @@ def main():
         raise RuntimeError('Use locked public VeriTrail Core 0.13.0')
     source = git('rev-parse', 'HEAD')
     run = 'guihong-m1-' + uuid.uuid4().hex
-    out = ROOT / 'artifacts/local' / run
-    out.mkdir(parents=True, exist_ok=False)
+    out = lab.local_run(run, create=True)
     child_ids = {name: getattr(args, name) for name in CHILDREN}
     resource_ids = {name: getattr(args, name + '_resource') for name in CHILDREN}
     request = {

@@ -34,4 +34,5 @@ jobs:
         with:
           python-version: '3.10'
       - run: python -B scripts/test_mysql_commit_proxy.py
+      - run: python -B scripts/test_engineering_guards.py
       - run: mvn -B -ntp -f backend/pom.xml -Dguihong.source_sha=${{ github.sha }} verify

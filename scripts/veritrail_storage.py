@@ -42,7 +42,7 @@ def main():
         if version(name)!=wanted:
             raise RuntimeError('Use locked public '+name)
     source=git('rev-parse','HEAD');state=lab.load();run='guihong-s3-'+uuid.uuid4().hex
-    out=ROOT/'artifacts/local'/run;out.mkdir(parents=True,exist_ok=False)
+    out=lab.local_run(run,create=True)
     lock=json.loads((ROOT/'docs/environment-lock.json').read_text(encoding='utf-8'))
     image=lock['images']['seaweedfs']['image']
     payload=('归鸿独立存储见证\r\n'+run+'\r\n').encode('utf-8')*8
