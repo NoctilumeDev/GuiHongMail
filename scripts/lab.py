@@ -128,7 +128,13 @@ def init():
         'brokerIP1=127.0.0.1','listenPort=20911','autoCreateTopicEnable=false','autoCreateSubscriptionGroup=false',
         'flushDiskType=SYNC_FLUSH','storePathRootDir=/home/rocketmq/store','mapedFileSizeCommitLog=67108864',
         'maxMessageSize=1048576','diskMaxUsedSpaceRatio=85','deleteWhen=04','fileReservedTime=72',
-        'enableControllerMode=false','timerWheelEnable=false'])+'\n')
+        'enableControllerMode=false','timerWheelEnable=false',
+        'sendMessageThreadPoolNums=2','putMessageFutureThreadPoolNums=1','pullMessageThreadPoolNums=2',
+        'litePullMessageThreadPoolNums=1','ackMessageThreadPoolNums=1','processReplyMessageThreadPoolNums=1',
+        'queryMessageThreadPoolNums=1','adminBrokerThreadPoolNums=1','clientManageThreadPoolNums=1',
+        'consumerManageThreadPoolNums=1','loadBalanceProcessorThreadPoolNums=1','recoverThreadPoolNums=1',
+        'endTransactionThreadPoolNums=1','batchDispatchRequestThreadPoolNums=1',
+        'serverWorkerThreads=2','serverSelectorThreads=1','clientWorkerThreads=2','clientSelectorThreads=1'])+'\n')
     (LAB/'witness').mkdir()
     write_new(LAB/'state.json',json.dumps(state,indent=2)+'\n')
     print(json.dumps({'id':run_id,'initialized':True,'credentials':'private ignored files only'}))
