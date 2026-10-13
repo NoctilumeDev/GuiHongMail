@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+import time
 
 from playwright.sync_api import sync_playwright
 
@@ -62,7 +63,11 @@ def main():
         }""")
         page.get_by_role('button', name='收件箱').click()
         page.locator('.message-row').first.click(no_wait_after=True)
-        page.wait_for_function("window.__heldResponse !== null")
+        deadline = time.monotonic() + 10
+        while not page.evaluate("() => window.__heldResponse !== null"):
+            if time.monotonic() >= deadline:
+                raise RuntimeError('controlled A response was not held')
+            time.sleep(.05)
         page.get_by_role('button', name='退出').click()
         page.get_by_label('邮箱地址').fill(secrets['accounts']['bob']['address'])
         page.get_by_label('密码').fill(secrets['accounts']['bob']['password'])
