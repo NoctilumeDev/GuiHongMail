@@ -58,26 +58,26 @@ def compose(args, timeout=300, capture=False):
     env = dict(os.environ)
     env.update(GUIHONG_LAB_ID=state['id'], GUIHONG_LAB_DIR=LAB.resolve().as_posix())
     cmd = [docker(), 'compose', '--project-name', state['id'], '-f', str(ROOT/'deploy/compose.yaml'), *args]
-    return subprocess.run(cmd, cwd=ROOT, env=env, timeout=timeout, capture_output=capture, text=True, check=True)
+    return subprocess.run(cmd, cwd=ROOT, env=env, timeout=timeout, capture_output=capture, text=True, encoding='utf-8', check=True)
 
 def assert_owned():
     state = load()
-    ids = subprocess.check_output([docker(),'ps','-aq','--filter','label=com.docker.compose.project='+state['id']],text=True).split()
+    ids = subprocess.check_output([docker(),'ps','-aq','--filter','label=com.docker.compose.project='+state['id']],text=True,encoding='utf-8').split()
     for identity in ids:
-        info = json.loads(subprocess.check_output([docker(),'inspect',identity],text=True))[0]
+        info = json.loads(subprocess.check_output([docker(),'inspect',identity],text=True,encoding='utf-8'))[0]
         if info['Config']['Labels'].get('guihong.owner') != state['id']:
             raise RuntimeError('Project collision/unowned container; stop without mutation')
     # Existing named volumes/networks must agree before Compose is allowed to reuse them.
     for kind in ('volume','network'):
-        names = subprocess.check_output([docker(),kind,'ls','-q','--filter','label=com.docker.compose.project='+state['id']],text=True).split()
+        names = subprocess.check_output([docker(),kind,'ls','-q','--filter','label=com.docker.compose.project='+state['id']],text=True,encoding='utf-8').split()
         for name in names:
-            info = json.loads(subprocess.check_output([docker(),kind,'inspect',name],text=True))[0]
+            info = json.loads(subprocess.check_output([docker(),kind,'inspect',name],text=True,encoding='utf-8'))[0]
             if (info.get('Labels') or {}).get('guihong.owner') != state['id']:
                 raise RuntimeError('Project collision/unowned persistent resource')
         expected = ('mysql-data','object-data','mq-data') if kind=='volume' else ('database','storage','mq')
         for suffix in expected:
             name=state['id']+'_'+suffix
-            inspected=subprocess.run([docker(),kind,'inspect',name],capture_output=True,text=True)
+            inspected=subprocess.run([docker(),kind,'inspect',name],capture_output=True,text=True,encoding='utf-8')
             if inspected.returncode==0:
                 info=json.loads(inspected.stdout)[0]
                 if (info.get('Labels') or {}).get('guihong.owner')!=state['id']:
@@ -90,7 +90,7 @@ def assert_owned():
 def owned_ports():
     ports=set()
     for identity in assert_owned():
-        info=json.loads(subprocess.check_output([docker(),'inspect',identity],text=True))[0]
+        info=json.loads(subprocess.check_output([docker(),'inspect',identity],text=True,encoding='utf-8'))[0]
         for mappings in (info['NetworkSettings'].get('Ports') or {}).values():
             for mapping in mappings or []:
                 if mapping['HostIp']=='127.0.0.1':
