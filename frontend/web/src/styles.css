@@ -23,7 +23,7 @@ input, textarea, select { width: 100%; border: 0; border-bottom: 1px solid #cbc9
 .brand { display: flex; align-items: center; gap: 10px; font: 22px serif; letter-spacing: .14em; }.brand-mark { width: 28px; height: 28px; font-size: 15px; }
 .search { display: flex; border-bottom: 1px solid #b9bbb6; }.search input { border: 0; background: transparent; }.search button, .account button { border: 0; background: transparent; color: #656963; }
 .account { justify-self: end; display: flex; align-items: center; gap: 14px; font-size: 13px; }.mobile-back { display: none; }
-.global-message { position: fixed; z-index: 20; top: 70px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 16px; background: #fbfaf7; border: 1px solid #e0ddd5; box-shadow: 0 5px 18px rgba(40,44,43,.08); }
+.global-message { position: fixed; z-index: 20; top: 70px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 16px; pointer-events: none; background: #fbfaf7; border: 1px solid #e0ddd5; box-shadow: 0 5px 18px rgba(40,44,43,.08); }
 .workspace { height: calc(100dvh - 64px); display: grid; grid-template-columns: 232px minmax(300px, 390px) minmax(420px, 1fr); transition: grid-template-columns .2s ease; }
 .workspace.left-collapsed { grid-template-columns: 64px minmax(300px, 390px) minmax(420px, 1fr); }.workspace.list-collapsed { grid-template-columns: 232px 52px minmax(420px, 1fr); }.workspace.left-collapsed.list-collapsed { grid-template-columns: 64px 52px minmax(420px, 1fr); }
 .pane { min-width: 0; height: 100%; overflow-y: auto; position: relative; scrollbar-color: #c4c7c2 transparent; scrollbar-width: thin; }
