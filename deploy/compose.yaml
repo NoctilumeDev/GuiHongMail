@@ -74,6 +74,10 @@ services:
     volumes:
       - mq-data:/home/rocketmq/store
       - ${GUIHONG_LAB_DIR}/broker.conf:/config/broker.conf:ro
+      - ./rocketmq-logback.xml:/home/rocketmq/rocketmq-5.5.0/conf/rmq.broker.logback.xml:ro
+    logging:
+      driver: json-file
+      options: {max-size: '10m', max-file: '3'}
     networks: [mq]
 volumes:
   mysql-data:

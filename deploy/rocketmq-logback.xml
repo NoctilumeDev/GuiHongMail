@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Single bounded local broker: retain all INFO+ categories without 19 idle async workers. -->
+<configuration>
+  <appender name="OwnedBrokerConsole" class="ch.qos.logback.core.ConsoleAppender">
+    <target>System.err</target>
+    <encoder><pattern>%date{ISO8601} %-5level [%thread] %logger - %msg%n</pattern></encoder>
+  </appender>
+  <root level="INFO"><appender-ref ref="OwnedBrokerConsole"/></root>
+</configuration>
