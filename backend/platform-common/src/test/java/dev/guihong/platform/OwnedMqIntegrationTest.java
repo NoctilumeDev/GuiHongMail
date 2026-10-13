@@ -56,8 +56,10 @@ class OwnedMqIntegrationTest {
         } catch(Exception | AssertionError error){facts.put("exception",error.getClass().getName());throw error;}
         finally {
             consumer.shutdown();producer.shutdown();
-            if(created && complete){admin.deleteTopicInBroker(Set.of(broker),topic);admin.deleteTopicInNameServer(Set.of(namesrv),topic);admin.deleteSubscriptionGroup(broker,group,false);facts.put("cleanup","EXACT_CREATED_TOPIC_AND_GROUP");}
-            admin.shutdown();new ObjectMapper().writeValue(out.toFile(),facts);
+            try {
+                if(created && complete){admin.deleteTopicInBroker(Set.of(broker),topic);admin.deleteTopicInNameServer(Set.of(namesrv),topic);admin.deleteSubscriptionGroup(broker,group,false);facts.put("cleanup","EXACT_CREATED_TOPIC_AND_GROUP");}
+            } catch(Exception cleanup){facts.put("cleanup_exception",cleanup.getClass().getName());throw cleanup;}
+            finally{admin.shutdown();new ObjectMapper().writeValue(out.toFile(),facts);}
         }
     }
 }

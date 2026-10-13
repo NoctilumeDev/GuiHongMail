@@ -128,7 +128,7 @@ def init():
         'brokerIP1=127.0.0.1','listenPort=20911','autoCreateTopicEnable=false','autoCreateSubscriptionGroup=false',
         'flushDiskType=SYNC_FLUSH','storePathRootDir=/home/rocketmq/store','mapedFileSizeCommitLog=67108864',
         'maxMessageSize=1048576','diskMaxUsedSpaceRatio=85','deleteWhen=04','fileReservedTime=72',
-        'enableControllerMode=false','timerWheelEnable=false','messageDelayLevel=1s 5s 10s',
+        'enableControllerMode=false','timerWheelEnable=true','timerGetMessageThreadNum=1','timerPutMessageThreadNum=1','messageDelayLevel=1s 5s 10s',
         'reviveQueueNum=1','popConsumerFSServiceInit=false',
         'sendMessageThreadPoolNums=2','putMessageFutureThreadPoolNums=1','pullMessageThreadPoolNums=2',
         'litePullMessageThreadPoolNums=1','ackMessageThreadPoolNums=1','processReplyMessageThreadPoolNums=1',
