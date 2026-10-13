@@ -37,7 +37,7 @@ services:
     cpus: 1.0
     pids_limit: 128
     environment:
-      JAVA_OPT_EXT: '-Xms64m -Xmx96m -XX:MaxDirectMemorySize=32m'
+      JAVA_OPT_EXT: '-Xms64m -Xmx96m -XX:MaxDirectMemorySize=32m -XX:ActiveProcessorCount=1'
     command: ['sh', 'mqnamesrv']
     ports: ['127.0.0.1:19876:9876']
     networks: [mq]
@@ -64,7 +64,8 @@ services:
     cpus: 1.0
     pids_limit: 128
     environment:
-      JAVA_OPT_EXT: '-Xms128m -Xmx192m -XX:MaxDirectMemorySize=64m'
+      HEAP_OPTS: '-Xms128m -Xmx192m -XX:MaxDirectMemorySize=64m'
+      JAVA_OPT_EXT: '-XX:ActiveProcessorCount=1'
     command: ['sh', 'mqbroker', '-n', 'namesrv:9876', '-c', '/config/broker.conf']
     depends_on:
       namesrv: {condition: service_started}
