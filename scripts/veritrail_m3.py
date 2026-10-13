@@ -579,7 +579,7 @@ def collect(out):
     resource_path = Path(resource_line['evidence'])
     resource_rows = [json.loads(line) for line in resource_path.read_text(encoding='utf-8').splitlines() if line]
 
-    delivery_rows = rows('delivery', 'SELECT j.recipient,j.state,j.attempt_count,a.epoch_no,a.started_at,a.completed_at,a.last_stage,a.data_submitted,a.smtp_code,a.outcome,a.evidence_sha256,a.duplicate_risk_ack,a.prior_attempt_id FROM delivery_jobs j JOIN delivery_attempts a ON a.job_id=j.job_id WHERE j.scope_id=%s ORDER BY j.recipient,a.epoch_no', (mixed_intent['dispatchScopeId'],))
+    delivery_rows = rows('delivery', 'SELECT j.recipient,j.state,j.attempt_count,a.attempt_id,a.epoch_no,a.started_at,a.completed_at,a.last_stage,a.data_submitted,a.smtp_code,a.outcome,a.evidence_sha256,a.duplicate_risk_ack,a.prior_attempt_id FROM delivery_jobs j JOIN delivery_attempts a ON a.job_id=j.job_id WHERE j.scope_id=%s ORDER BY j.recipient,a.epoch_no', (mixed_intent['dispatchScopeId'],))
     intent_rows = rows('mailbox', 'SELECT intent_id,draft_id,draft_version,request_key,payload_sha256,dispatch_scope_id,raw_sha256,raw_size,envelope_json FROM send_intents WHERE intent_id=%s', (intent['id'],))
     scope_count = scalar('delivery', 'SELECT COUNT(*) FROM dispatch_scopes WHERE source_intent_id=%s', (intent['id'],))
     job_count = scalar('delivery', 'SELECT COUNT(*) FROM delivery_jobs WHERE scope_id=%s', (intent['dispatchScopeId'],))
@@ -642,7 +642,7 @@ def collect(out):
         'M3-08': retained.get('data',[0])[0] == 250 and retained_counts_before == retained_counts_after == {'receipts':1,'members':1} and scalar('ingress','SELECT state FROM accepted_spools WHERE spool_id=%s',(retained_spool['spool_id'],)) == 'GC_ELIGIBLE',
         'M3-09': jobs['accept@test.invalid']['state']=='NEXT_HOP_ACCEPTED' and jobs['temp@test.invalid']['state']=='NEXT_HOP_ACCEPTED' and jobs['perm@test.invalid']['state']=='PERMANENT_FAILURE' and jobs['unknown@test.invalid']['state']=='UNKNOWN',
         'M3-10': len(delivery_by_recipient['temp@test.invalid']) == 3 and len(delivery_by_recipient['perm@test.invalid']) == 1 and temp_times[1]-temp_times[0] >= .8 and temp_times[2]-temp_times[1] >= 1.8,
-        'M3-11': len(unknown_rows) == 2 and unknown_rows[0]['outcome']=='UNKNOWN' and bool(unknown_rows[0]['data_submitted']) and unknown_rows[0]['last_stage']=='DATA_SUBMITTED' and unknown_rows[0]['evidence_sha256'] and next(item for item in unknown_stable['recipients'] if item['recipient']=='unknown@test.invalid')['attemptCount'] == 1,
+        'M3-11': len(unknown_rows) == 2 and unknown_rows[0]['outcome']=='UNKNOWN' and bool(unknown_rows[0]['data_submitted']) and unknown_rows[0]['last_stage']=='FINAL_REPLY' and unknown_rows[0]['evidence_sha256'] and next(item for item in unknown_stable['recipients'] if item['recipient']=='unknown@test.invalid')['attemptCount'] == 1,
         'M3-12': unconfirmed[0] == 400 and len(unknown_rows) == 2 and bool(unknown_rows[1]['duplicate_risk_ack']) and unknown_rows[1]['prior_attempt_id'] == unknown_rows[0]['attempt_id'],
         'M3-13': cancel_one['state']==cancel_two['state']==cancel_after_restart['state']=='CANCELLED' and cancel_attempts == 0,
         'M3-14': worker_cancel[0] == 409 and hold_final['delivery']['everStarted'] and hold_final['delivery']['recipients'][0]['attemptCount'] == 1,
