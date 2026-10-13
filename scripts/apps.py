@@ -94,9 +94,10 @@ def build():
     if p.returncode:raise RuntimeError('Build failed; retained '+str(target))
     print(json.dumps({'source_sha':sha,'build_log':str(target),'exit_code':p.returncode}))
 
-def start():
+def start(database_ports=None):
     lab.assert_owned()
-    if lab.memory()['free_bytes']<4*1024**3:raise RuntimeError('App admission requires 4 GiB free')
+    if lab.memory()['used_bytes']>14*1024**3:raise RuntimeError('Host memory stop line reached before app startup')
+    database_ports=database_ports or {}
     PROCESSES.mkdir(exist_ok=True)
     credentials=private();source=subprocess.check_output(['git','rev-parse','HEAD'],cwd=lab.ROOT,text=True).strip()
     for role in lab.SERVICES:
@@ -111,7 +112,7 @@ def start():
         if not jar.is_file():raise RuntimeError('Exact build unavailable')
         db=credentials['database'][role];storage=credentials['storage'][role];env=environment()
         env.update(GUIHONG_WITNESS_ROOT=str(lab.LAB/'witness'/role),GUIHONG_INTERNAL_TOKEN=credentials['internal'][role],
-            GUIHONG_DB_URL=f"jdbc:mysql://127.0.0.1:13306/{db['schema']}?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectTimeout=3000&socketTimeout=10000",
+            GUIHONG_DB_URL=f"jdbc:mysql://127.0.0.1:{database_ports.get(role,13306)}/{db['schema']}?sslMode=DISABLED&allowPublicKeyRetrieval=true&connectTimeout=3000&socketTimeout=10000",
             GUIHONG_DB_USER=db['user'],GUIHONG_DB_PASSWORD=db['password'],GUIHONG_S3_ENDPOINT='http://127.0.0.1:19833',
             GUIHONG_S3_BUCKET=storage['bucket'],GUIHONG_S3_KEY=storage['access_key'],GUIHONG_S3_SECRET=storage['secret_key'],
             GUIHONG_NAMESRV='127.0.0.1:19876',GUIHONG_BROKER='127.0.0.1:20911',GUIHONG_LAB_ID=lab.load()['id'])

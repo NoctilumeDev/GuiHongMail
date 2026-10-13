@@ -20,5 +20,6 @@
 | 2026-10-13T06:26:44Z | source `4b84250969bc8ae811cfa8a6a604dd4a0c3676d7` 第一 foundation 运行 `guihong-foundation-f0c1dbe22e5e4a7bb9c66a4aa8066081` ERROR / PENDING；Mailbox 在启动时因 final Repository 不允许 Spring 异常转换代理退出，启动器随后遇退出进程的路径读取竞态。原应用日志与 Plan/Evidence/Bundle 保留；schema V2 已执行并有库外完成记录，后续不重置数据库 |
 | 2026-10-13T06:29:12Z | source `c826ae73b3d38bf7653fa2a3f0d6f47a70d9d805` foundation `guihong-foundation-cddc2405f0d24d668e5374d3dafdb43c` ERROR / PENDING；MQ 收发原生断言完成后 topic 清理 CODE 1。服务端与官方源码确认 disabled TimerWheel 被无条件引用，保留 native/broker 首败，按组件 1.1 重分配原 JVM 内存预算并撤销不兼容 workaround |
 | 2026-10-13T06:38:44Z | source `8f17555bf6613f8cb6c76220901f1bb703a2b95f` foundation `guihong-foundation-58a7736ac2bf4230afa6d34bccfd86cf` COMPLETED / PENDING；真实 MQ 收发与精确清理成功，Broker 约 304 MiB / 118 PIDs。Core 隐私层把名为 cookie / wrong_password 的非敏感状态投影整体遮蔽，5 条原断言无法读取。保留 PENDING；normalization 1.1 只保留非秘密 HTTP 事实并用中性投影名，原值预期及密码/Cookie 隐私规则不降低 |
+| 2026-10-13T06:57Z | source `478a37c8cfb61e8521ae071a16c4fe57291a3e92` 对象生命周期候选编译成功；第一次应用开发启动在脚本的重复 4 GiB 准入检查处停止，尚未创建应用进程。合同只要求完整实验启动前一次 4 GiB 准入，运行中使用 14 GiB 三次采样及 384 MiB/app 停止线；移除重复检查但不降低任何冻结资源边界 |
 
 环境可用窗口已恢复，首败不会被后续成功覆盖。主页参考文档按当前中文主线 `NoctilumeDev/NoctilumeDev-ZH@5fe4cddcddc76d883476d004147fcddfaa24ac06` 阅读；同名本地 profile 分支包含更晚的未合入补充，不把它当已发布事实。M6 结束时间、墙钟时长与 Release 身份尚不存在。
