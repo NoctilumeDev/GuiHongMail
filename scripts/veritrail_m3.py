@@ -386,9 +386,17 @@ def collect(out):
     s3_spools_after = scalar('ingress', 'SELECT COUNT(*) FROM accepted_spools')
 
     # M3-08: accepted spool remains while Mailbox is down, imports once after recovery, and replay is idempotent.
+    retained_client, retained_prefix = smtp_open(['alice@guihong.test'])
     go_apps.stop(roles=['mailbox'])
     retained_subject = 'M3 保留 ' + uuid.uuid4().hex[:8]
-    retained = smtp_transaction(raw_message(retained_subject, 'RETAINED'), ['alice@guihong.test'])
+    try:
+        code, message = retained_client.data(raw_message(retained_subject, 'RETAINED'))
+        retained = {'prefix': retained_prefix, 'data': [code, message.decode(errors='replace')]}
+    except (smtplib.SMTPException, OSError) as failure:
+        retained = {'prefix': retained_prefix, 'exception': type(failure).__name__ + ': ' + str(failure)}
+    finally:
+        try: retained_client.close()
+        except OSError: pass
     retained_spool = wait_until('retained accepted spool', lambda: (lambda item: item if item and item['state'] == 'ACCEPTED' else None)(
         next(iter(rows('ingress', 'SELECT spool_id,state,raw_sha256 FROM accepted_spools ORDER BY accepted_at DESC LIMIT 1')), None)), 20)
     go_apps.start(roles=['mailbox'])
