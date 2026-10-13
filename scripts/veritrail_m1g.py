@@ -226,8 +226,16 @@ def capture_resource_window(process, binary, out):
     target = out / 'resource-window.jsonl'
     samples = []
     consecutive_high = 0
+    next_sample = time.monotonic()
     with target.open('x', encoding='utf-8', newline='\n') as stream:
         while process.poll() is None:
+            while process.poll() is None and time.monotonic() < next_sample:
+                remaining = next_sample - time.monotonic()
+                if remaining <= 0:
+                    break
+                time.sleep(min(.2, remaining))
+            if process.poll() is not None:
+                break
             memory = lab.memory()
             containers = resource_guard.container_snapshot(contracts)
             reason = resource_guard.container_violation(containers)
@@ -258,10 +266,7 @@ def capture_resource_window(process, binary, out):
                     process.terminate()
                 lab.compose(['stop', '--timeout', '20'])
                 raise RuntimeError(f'resource stop line: {reason}')
-            for _ in range(25):
-                if process.poll() is not None:
-                    break
-                time.sleep(.2)
+            next_sample += 5
     return owned, samples
 
 

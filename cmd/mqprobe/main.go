@@ -46,8 +46,8 @@ type evidence struct {
 	Binding       mqprobe.Binding   `json:"binding"`
 	Nameserver    string            `json:"nameserver"`
 	Broker        string            `json:"broker"`
-	TopicPresent  bool              `json:"topic_present,omitempty"`
-	GroupPresent  bool              `json:"group_present,omitempty"`
+	TopicPresent  bool              `json:"topic_present"`
+	GroupPresent  bool              `json:"group_present"`
 	Topics        []string          `json:"owned_topics,omitempty"`
 	Groups        []string          `json:"owned_groups,omitempty"`
 	DeletedTopics []string          `json:"deleted_topics,omitempty"`
@@ -361,7 +361,7 @@ func send(ctx context.Context, cfg commonFlags, key string, body []byte) (sendEv
 	}
 	return sendEvidence{
 		Key: key, BodySHA256: mqprobe.SHA256(body), MessageID: result.MsgID, OffsetMsgID: result.OffsetMsgID,
-		QueueOffset: result.QueueOffset, SendStatus: fmt.Sprint(result.Status),
+		QueueOffset: result.QueueOffset, SendStatus: "SEND_OK",
 	}, nil
 }
 
