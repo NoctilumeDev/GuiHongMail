@@ -14,7 +14,8 @@ import pymysql
 from veritrail.acceptance_plan import observation_spec_digest,seal_acceptance_plan
 from veritrail.acceptance_reporting import create_acceptance_bundle
 from veritrail.canonical import sha256_json
-import apps,lab
+import go_apps as apps,lab
+import veritrail_m1g as m1g
 
 ROOT=lab.ROOT
 def git(*args):return subprocess.check_output(['git',*args],cwd=ROOT,text=True).strip()
@@ -24,22 +25,26 @@ def save(path,value):lab.write_new(path,json.dumps(value,ensure_ascii=False,inde
 def main():
     if git('status','--porcelain') or version('veritrail')!='0.13.0':raise RuntimeError('Clean exact source and public locked Core required')
     source=git('rev-parse','HEAD');run='guihong-foundation-'+uuid.uuid4().hex;out=lab.local_run(run,create=True)
+    _,build_artifacts=apps.verified_build(source)
+    mq_run='guihong-m1g-'+uuid.uuid4().hex
     expected={'source_sha':source,'lab_id':lab.load()['id'],'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),
         'contract_sha256':sha((ROOT/'docs/m1-plan.md').read_bytes()),
+        'go_contract_sha256':sha((ROOT/'docs/m0.1-go-runtime.md').read_bytes()),
         'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.1.md').read_bytes()),
-        'mq_topic':lab.load()['id'].replace('-','_')+'_probe_'+uuid.uuid4().hex[:12],
-        'jars':{r:sha((ROOT/'backend'/apps.MODULES[r]/'target'/(apps.MODULES[r]+'-0.1.0-SNAPSHOT.jar')).read_bytes()) for r in lab.SERVICES}}
+        'mq_binding':{'run':mq_run,'topic':mq_run+'-topic','group':mq_run+'-group'},
+        'artifacts':{r:build_artifacts[r]['sha256'] for r in lab.SERVICES}}
     spec={'id':'foundation-observation','contract':{'id':'guihong-foundation','version':'1.1'},'evidence_type':'guihong.foundation',
         'coordinates':expected,'projections':['source_sha','startup','database','sessions','smtp','mq','drain','shutdown'],
         'canonicalization_profile':'veritrail-json-c14n/1'}
     def hard(id,path,value):return {'id':id,'severity':'HARD','left':{'requirement_id':'foundation','path':'/facts/'+path},'operator':'eq','right':value}
     assertions=[hard('exact-source','source_sha',source),hard('clean','source_clean',True),
         hard('base-contract','contract_sha256',expected['contract_sha256']),
+        hard('go-contract','go_contract_sha256',expected['go_contract_sha256']),
         hard('component','component_sha256',expected['component_sha256']),
         hard('resource-contract','resource_contract_sha256',expected['resource_contract_sha256'])]
     for r in lab.SERVICES:
         assertions+=[hard(r+'-role','startup/'+r+'/service',r),hard(r+'-source','startup/'+r+'/source_sha',source),hard(r+'-state','startup/'+r+'/state','READY'),
-            hard(r+'-ready','readiness/'+r+'/http',200),hard(r+'-jar','startup_jars/'+r,expected['jars'][r]),hard(r+'-own-db','database/'+r+'/own_crud','ROLLED_BACK'),
+            hard(r+'-ready','readiness/'+r+'/http',200),hard(r+'-artifact','startup_artifacts/'+r,expected['artifacts'][r]),hard(r+'-own-db','database/'+r+'/own_crud','ROLLED_BACK'),
             hard(r+'-wrong-token','internal_wrong/'+r+'/http',401),hard(r+'-no-token','internal_anonymous/'+r+'/http',401),
             hard(r+'-db-read','database/'+r+'/read_hash',sha(r.encode())),hard(r+'-db-delete','database/'+r+'/deleted_rows',1),
             hard(r+'-storage-down','dependency_down/'+r+'/http',503),hard(r+'-storage-restored','dependency_restored/'+r+'/http',200),hard(r+'-drain','drain/'+r+'/http',200),hard(r+'-shutdown','shutdown/'+r,True)]
@@ -50,8 +55,11 @@ def main():
     assertions+=[hard('uniform-login-feedback','sessions/invalid_login/body',{'code':'AUTHENTICATION_FAILED'}),hard('uniform-unknown-feedback','sessions/unknown_account/body',{'code':'AUTHENTICATION_FAILED'}),
         hard('http-only','session_attributes/httponly',True),hard('same-site','session_attributes/samesite','Strict'),hard('cookie-path','session_attributes/path','/api'),
         hard('external-relay','smtp/external_rcpt',550),hard('no-false-accept','smtp/local_rcpt',451),hard('no-data-responsibility','smtp/data',503),
-        hard('mq-send','mq/send_status','SEND_OK'),hard('mq-pull','mq/pull_status','FOUND'),hard('mq-body','mq/received_sha256',sha(('归鸿真实 MQ 见证|'+expected['mq_topic']).encode())),
-        hard('mq-cleanup','mq/cleanup','EXACT_CREATED_TOPIC_AND_GROUP'),hard('broker-budget','broker/memory_limit',512*1024**2),hard('broker-no-oom','broker/oom_killed',False),hard('broker-pid-budget','broker/pid_limit',192)]
+        hard('mq-prepare-send','mq/prepare_send_status','SEND_OK'),hard('mq-consume-send','mq/consume_send_status','SEND_OK'),
+        hard('mq-pull','mq/consume_complete',True),hard('mq-retry','mq/retry_observed',True),
+        hard('mq-bodies','mq/received_sha256',sorted([sha(m1g.payload(mq_run,'stored-before-restart')),sha(m1g.payload(mq_run,'sent-after-consumer'))])),
+        hard('mq-topic-cleanup','mq/topic_present_after',False),hard('mq-group-cleanup','mq/group_present_after',False),
+        hard('broker-budget','broker/memory_limit',512*1024**2),hard('broker-no-oom','broker/oom_killed',False),hard('broker-pid-budget','broker/pid_limit',192)]
     plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-foundation','version':3,
         'subject':{'id':'guihong-m1-foundation-identity-smtp','version':source,'source_ref':'github:NoctilumeDev/GuiHongMail'},
         'question':'Do independent services, actual database identities, bounded sessions, rejecting SMTP and actual ordinary MQ satisfy M1 foundation obligations?',
@@ -60,7 +68,7 @@ def main():
         'sufficiency_rules':[{'id':'coverage','left':{'requirement_id':'foundation','path':'/metadata/veritrail_observation/coverage'},'operator':'eq','right':'COMPLETE'}],
         'integrity_rules':[],'assertions':assertions,'resource_budget':{'max_artifact_bytes':2097152,'max_probe_seconds':600},
         'change_scope':{'level':'L2_CONTRACT','owner':'GuiHongMail M1','consumers':['foundation','identity','smtp-foundation']},
-        'reproduction_steps':['Build exact clean candidate with scripts/apps.py build; preserve owned virgin preparation and witness.','Run this collector in separately installed locked public Core environment.'],
+        'reproduction_steps':['Build exact clean candidate with scripts/go_apps.py build; preserve owned virgin preparation and witness.','Run this collector in separately installed locked public Core environment.'],
         'cleanup_steps':['Normal owned app shutdown; dependency outage is restored; retain all first failures and durable witness.','Only exact probe topic/group created in this run may be removed.']})
     save(out/'sealed-plan.json',plan);save(out/'request.json',expected)
     begin=time.monotonic();credentials=apps.private();events=out/'source-events.jsonl'
@@ -87,12 +95,13 @@ def main():
         event({'method':method,'service':role,'path':path,'result':result,'response_bytes':len(raw),'response_sha256':sha(raw)})
         return result,value,set_cookie
     facts={'source_sha':source,'source_clean':True,'contract_sha256':expected['contract_sha256'],
+        'go_contract_sha256':expected['go_contract_sha256'],
         'component_sha256':expected['component_sha256'],
         'resource_contract_sha256':expected['resource_contract_sha256'],'boundary':'M1_FOUNDATION_IDENTITY_SMTP_ONLY'}
     status='COMPLETED';bob_id=None
     try:
         apps.start();facts['startup']={r:apps.request(r,'/internal/identity') for r in lab.SERVICES}
-        facts['startup_jars']={r:json.loads((apps.PROCESSES/(r+'.json')).read_text())['jar_sha256'] for r in lab.SERVICES}
+        facts['startup_artifacts']={r:json.loads((apps.PROCESSES/(r+'.json')).read_text())['artifact_sha256'] for r in lab.SERVICES}
         facts['readiness']={r:call(r,'/health/ready')[0] for r in lab.SERVICES}
         facts['internal_wrong']={r:call(r,'/internal/identity',internal=True,wrong_token=True)[0] for r in lab.SERVICES}
         facts['internal_anonymous']={r:call(r,'/internal/identity')[0] for r in lab.SERVICES}
@@ -160,11 +169,21 @@ def main():
             facts['smtp']['local_rcpt']=smtp.rcpt('alice@guihong.test')[0]
             smtp.putcmd('DATA');facts['smtp']['data']=smtp.getreply()[0]
         event({'smtp':facts['smtp']})
-        env=apps.environment();env.update(GUIHONG_INTEGRATION='1',GUIHONG_LAB_ID=lab.load()['id'],GUIHONG_MQ_PROBE_TOPIC=expected['mq_topic'],GUIHONG_MQ_PROBE_OUT=str(out/'mq-native.json'))
-        with (out/'mq-native.log').open('x',encoding='utf-8') as log:
-            result=subprocess.run([str(apps.MVN),'-B','-ntp','-s',str(ROOT/'.artifacts/build/settings.xml'),'-Dmaven.repo.local='+str(ROOT/'.artifacts/m2'),'-f',str(ROOT/'backend/pom.xml'),'-pl','platform-common','-Dtest=OwnedMqIntegrationTest','test'],cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT,timeout=180)
-        if (out/'mq-native.json').exists():facts['mq']=json.loads((out/'mq-native.json').read_text())
-        if result.returncode:raise RuntimeError('Real MQ native probe failed; original log preserved')
+        binding=expected['mq_binding'];binary,_=m1g.build_probe(out)
+        prepare=m1g.run_probe(binary,'prepare',binding,out,'mq-prepare')
+        m1g.mqadmin(out,'mq-create-group','updateSubGroup',binding)
+        lab.compose(['restart','--timeout','20','broker'],timeout=120,capture=True);m1g.wait_mq(out,'mq-restart-ready')
+        consume=m1g.run_probe(binary,'consume',binding,out,'mq-consume',extra=['--min-live','30s'],timeout=120)
+        before=m1g.run_probe(binary,'inspect',binding,out,'mq-before-cleanup')
+        m1g.mqadmin(out,'mq-delete-group','deleteSubGroup',binding)
+        m1g.run_probe(binary,'delete-topic',binding,out,'mq-delete-topics')
+        after=m1g.run_probe(binary,'inspect',binding,out,'mq-after-cleanup')
+        facts['mq']={'prepare_send_status':prepare['sends'][0]['send_status'],
+            'consume_send_status':consume['sends'][0]['send_status'],'consume_complete':consume['complete'],
+            'retry_observed':any(a['decision']=='RETRY' for a in consume['attempts']),
+            'received_sha256':sorted(f['body_sha256'] for f in consume['facts']),
+            'topic_present_before':before['topic_present'],'group_present_before':before['group_present'],
+            'topic_present_after':after['topic_present'],'group_present_after':after['group_present']}
         broker=json.loads(subprocess.check_output([lab.docker(),'inspect',lab.load()['id']+'-broker-1'],text=True,encoding='utf-8'))[0]
         facts['broker']={'memory_limit':broker['HostConfig']['Memory'],'pid_limit':broker['HostConfig']['PidsLimit'],'oom_killed':broker['State']['OOMKilled'],'jvm':next(x for x in broker['Config']['Env'] if x.startswith('HEAP_OPTS='))}
         lab.compose(['stop','--timeout','20','seaweedfs'],capture=True)

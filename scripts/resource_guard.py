@@ -132,8 +132,9 @@ def run(duration, runtime_profile='java'):
                 for role in lab.SERVICES:
                     path=application.PROCESSES/(role+'.json')
                     if not path.exists():continue
-                    owner=application.owned_process(role);actual=apps.process_identity(owner['pid'])
+                    owner=json.loads(path.read_text());actual=apps.process_identity(owner['pid'])
                     if actual is None:continue
+                    owner=application.owned_process(role)
                     if actual!={k:owner[k] for k in ('creation_ticks','executable')} or owner['lab_id']!=lab.load()['id']:
                         raise RuntimeError('PID ownership changed; no stop/mutation of unknown process')
                     value=rss(owner['pid']);processes.append({'role':role,'pid':owner['pid'],'rss_bytes':value})

@@ -18,6 +18,8 @@ GO = Path('D:/DevTools/Go/go1.27.2/bin/go.exe')
 PORTS = {'mailbox': 18080, 'ingress': 18081, 'delivery': 18082}
 COMMANDS = {'mailbox': './cmd/mailbox', 'ingress': './cmd/ingress', 'delivery': './cmd/delivery'}
 PROCESSES = lab.LAB / 'go-applications'
+process_identity = apps.process_identity
+tcp_server_owners = apps.tcp_server_owners
 
 
 def environment(network=False):
@@ -203,7 +205,7 @@ def owned_http(role, path, method='GET', body=None, headers=None, internal=False
         connection.close()
 
 
-def start():
+def start(database_ports=None):
     lab.assert_owned()
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=lab.ROOT):
         raise RuntimeError('Application startup requires committed clean source')
@@ -212,6 +214,7 @@ def start():
     source = source_sha()
     receipt_path, artifacts = verified_build(source)
     credentials = private()
+    database_ports = database_ports or {}
     PROCESSES.mkdir(exist_ok=True)
     for role in lab.SERVICES:
         record = PROCESSES / (role + '.json')
@@ -225,7 +228,7 @@ def start():
         env = environment()
         env.update(GUIHONG_WITNESS_ROOT=str(lab.LAB / 'witness' / role),
                    GUIHONG_INTERNAL_TOKEN=credentials['internal'][role],
-                   GUIHONG_DB_DSN=f"{database['user']}:{database['password']}@tcp(127.0.0.1:13306)/{database['schema']}?parseTime=true&timeout=3s&readTimeout=10s&writeTimeout=10s&interpolateParams=true",
+                   GUIHONG_DB_DSN=f"{database['user']}:{database['password']}@tcp(127.0.0.1:{database_ports.get(role, 13306)})/{database['schema']}?parseTime=true&timeout=3s&readTimeout=10s&writeTimeout=10s&interpolateParams=true",
                    GUIHONG_S3_ENDPOINT='http://127.0.0.1:19833', GUIHONG_S3_BUCKET=storage['bucket'],
                    GUIHONG_S3_KEY=storage['access_key'], GUIHONG_S3_SECRET=storage['secret_key'],
                    GUIHONG_NAMESRV='127.0.0.1:19876', GUIHONG_BROKER='127.0.0.1:20911')

@@ -85,10 +85,10 @@ func NewWitness(database *sql.DB, root, service, source string, migrations []Mig
 	witness := &Witness{database: database, root: root, service: service, source: source,
 		generation: generation, lockPath: lockPath, nextSequence: 1,
 		state: "NOT_RECONCILED", reason: "NOT_CHECKED"}
-	if err := witness.initialize(context.Background(), migrations); err != nil && witness.state != "WAITING_DEPENDENCY" {
-		_ = witness.Close()
-		return nil, err
-	}
+	// Reconciliation failure is an observable fail-closed service state. Keep
+	// liveness and identity available so an operator can restore the exact
+	// witness and restart; no write path is admitted until reconciliation passes.
+	_ = witness.initialize(context.Background(), migrations)
 	return witness, nil
 }
 
