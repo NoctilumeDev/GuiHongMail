@@ -15,6 +15,7 @@ import apps
 import lab
 
 GO = Path('D:/DevTools/Go/go1.27.2/bin/go.exe')
+PYTHON = Path('D:/python-3.10.6/python.exe')
 NPM = Path('D:/Node.js/current/npm.cmd')
 PORTS = {'mailbox': 18080, 'ingress': 18081, 'delivery': 18082}
 COMMANDS = {'mailbox': './cmd/mailbox', 'ingress': './cmd/ingress', 'delivery': './cmd/delivery'}
@@ -112,6 +113,10 @@ def build():
                                 stdout=output, stderr=subprocess.STDOUT, timeout=300)
         if result.returncode:
             raise RuntimeError('Go dependency fetch failed; retained ' + str(log_path))
+        result = subprocess.run([str(PYTHON), '-B', 'scripts/test_classifier.py'], cwd=lab.ROOT,
+                                env=environment(), stdout=output, stderr=subprocess.STDOUT, timeout=30)
+        if result.returncode:
+            raise RuntimeError('Classifier contract gate failed; retained ' + str(log_path))
         for command in (['test', './...'], ['vet', './...']):
             result = subprocess.run([str(GO), *command], cwd=lab.ROOT, env=environment(),
                                     stdout=output, stderr=subprocess.STDOUT, timeout=300)
@@ -318,6 +323,9 @@ def start(database_ports=None, roles=None):
                    GUIHONG_S3_ENDPOINT='http://127.0.0.1:19833', GUIHONG_S3_BUCKET=storage['bucket'],
                    GUIHONG_S3_KEY=storage['access_key'], GUIHONG_S3_SECRET=storage['secret_key'],
                    GUIHONG_NAMESRV='127.0.0.1:19876', GUIHONG_BROKER='127.0.0.1:20911')
+        if role == 'mailbox':
+            env.update(GUIHONG_CLASSIFIER_PYTHON=str(PYTHON.resolve()),
+                       GUIHONG_CLASSIFIER_SCRIPT=str((lab.ROOT / 'algorithm/classifier.py').resolve()))
         log_path = PROCESSES / (role + '-' + uuid.uuid4().hex + '.log')
         with log_path.open('xb') as output:
             process = subprocess.Popen([str(artifacts[role]['path'])], cwd=lab.ROOT, env=env,

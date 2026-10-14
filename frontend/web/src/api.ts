@@ -1,4 +1,4 @@
-import type { AuthResponse, Category, DeliveryStatus, Draft, Folder, FolderCount, MessageDetail, MessageSummary, Page, SendIntent, SendStatus, User } from './model'
+import type { AuthResponse, Category, ClassificationEvaluation, ClassificationRule, ClassificationSettings, DeliveryStatus, Draft, Folder, FolderCount, MessageDetail, MessageSummary, Page, SendIntent, SendStatus, User } from './model'
 
 export class StaleResponseError extends Error { constructor() { super('STALE_RESPONSE') } }
 export class ApiError extends Error {
@@ -44,6 +44,16 @@ export class ApiClient {
   retryUnknown(intent: string, recipient: string, key: string): Promise<DeliveryStatus> {
     return this.request(`/api/mailbox/send-intents/${intent}/retry-unknown`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ confirmDuplicateRisk: true, recipient }) })
   }
+  classificationRules(): Promise<ClassificationRule[]> { return this.request('/api/mailbox/classification/rules') }
+  createClassificationRule(body: Omit<ClassificationRule, 'id' | 'version' | 'createdAt' | 'updatedAt'>): Promise<ClassificationRule> { return this.request('/api/mailbox/classification/rules', { method: 'POST', body: JSON.stringify(body) }) }
+  updateClassificationRule(rule: ClassificationRule): Promise<ClassificationRule> { return this.request(`/api/mailbox/classification/rules/${rule.id}`, { method: 'PUT', body: JSON.stringify(rule) }) }
+  deleteClassificationRule(rule: ClassificationRule): Promise<void> { return this.request(`/api/mailbox/classification/rules/${rule.id}?version=${rule.version}`, { method: 'DELETE' }) }
+  classificationSettings(): Promise<ClassificationSettings> { return this.request('/api/mailbox/classification/settings') }
+  setAlgorithmEnabled(settings: ClassificationSettings, enabled: boolean): Promise<ClassificationSettings> { return this.request('/api/mailbox/classification/settings', { method: 'PUT', body: JSON.stringify({ version: settings.version, algorithmEnabled: enabled }) }) }
+  setCategoryAuto(categoryId: string, enabled: boolean): Promise<ClassificationSettings> { return this.request(`/api/mailbox/classification/category-auto/${categoryId}`, { method: 'PUT', body: JSON.stringify({ enabled }) }) }
+  classification(entryId: string): Promise<ClassificationEvaluation> { return this.request(`/api/mailbox/messages/${entryId}/classification`) }
+  decideClassification(entryId: string, suggestionId: string, decision: 'ACCEPT' | 'REJECT', version: number): Promise<ClassificationEvaluation['suggestion']> { return this.request(`/api/mailbox/messages/${entryId}/classification/decision`, { method: 'POST', body: JSON.stringify({ suggestionId, decision, version }) }) }
+  undoClassification(entryId: string, actionId: string, version: number): Promise<MessageDetail> { return this.request(`/api/mailbox/messages/${entryId}/classification/undo`, { method: 'POST', body: JSON.stringify({ actionId, version }) }) }
 
   private async request<T>(path: string, init: RequestInit = {}, authenticated = true, json = true): Promise<T> {
     const observed = this.generation

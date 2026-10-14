@@ -14,20 +14,22 @@ var BuildSource string
 var sourcePattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 type Config struct {
-	Role           string
-	SourceSHA      string
-	HTTPAddress    string
-	SMTPAddress    string
-	WitnessRoot    string
-	InternalToken  string
-	InternalTokens map[string]string
-	DatabaseDSN    string
-	S3Endpoint     string
-	S3Bucket       string
-	S3Key          string
-	S3Secret       string
-	NameServer     string
-	Broker         string
+	Role             string
+	SourceSHA        string
+	HTTPAddress      string
+	SMTPAddress      string
+	WitnessRoot      string
+	InternalToken    string
+	InternalTokens   map[string]string
+	DatabaseDSN      string
+	S3Endpoint       string
+	S3Bucket         string
+	S3Key            string
+	S3Secret         string
+	NameServer       string
+	Broker           string
+	ClassifierPython string
+	ClassifierScript string
 }
 
 func LoadConfig(role string) (Config, error) {
@@ -69,6 +71,32 @@ func LoadConfig(role string) (Config, error) {
 	if err != nil || endpoint.Scheme != "http" || endpoint.Hostname() != "127.0.0.1" || endpoint.Port() == "" {
 		return Config{}, fmt.Errorf("approved profile requires loopback S3")
 	}
+	classifierPython, classifierScript := "", ""
+	if role == "mailbox" {
+		classifierPython, err = required("GUIHONG_CLASSIFIER_PYTHON")
+		if err != nil {
+			return Config{}, err
+		}
+		classifierScript, err = required("GUIHONG_CLASSIFIER_SCRIPT")
+		if err != nil {
+			return Config{}, err
+		}
+		for label, path := range map[string]string{"python": classifierPython, "script": classifierScript} {
+			absolute, failure := filepath.Abs(path)
+			if failure != nil {
+				return Config{}, fmt.Errorf("resolve classifier %s: %w", label, failure)
+			}
+			info, failure := os.Lstat(absolute)
+			if failure != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+				return Config{}, fmt.Errorf("classifier %s missing or unsafe", label)
+			}
+			if label == "python" {
+				classifierPython = absolute
+			} else {
+				classifierScript = absolute
+			}
+		}
+	}
 	return Config{
 		Role: role, SourceSHA: BuildSource, HTTPAddress: address, SMTPAddress: "127.0.0.1:12525",
 		WitnessRoot: root, InternalToken: values["GUIHONG_INTERNAL_TOKEN"],
@@ -78,5 +106,6 @@ func LoadConfig(role string) (Config, error) {
 		S3Endpoint:  values["GUIHONG_S3_ENDPOINT"], S3Bucket: values["GUIHONG_S3_BUCKET"],
 		S3Key: values["GUIHONG_S3_KEY"], S3Secret: values["GUIHONG_S3_SECRET"],
 		NameServer: values["GUIHONG_NAMESRV"], Broker: values["GUIHONG_BROKER"],
+		ClassifierPython: classifierPython, ClassifierScript: classifierScript,
 	}, nil
 }

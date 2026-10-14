@@ -6,7 +6,7 @@ export interface AuthResponse { user: User; csrf: string }
 export interface FolderCount { folder: Folder; total: number; unread: number }
 export interface Category { id: string; name: string; version: number; total: number; unread: number }
 export interface MessageSummary {
-  entryId: string; contentId: string; folder: Folder; read: boolean; categoryId: string | null; version: number
+  entryId: string; contentId: string; folder: Folder; read: boolean; categoryId: string | null; categorySource: string | null; version: number
   fromAddress: string; fromName: string | null; subject: string; preview: string; sentAt: string | null
   receivedAt: string; attachmentCount: number
 }
@@ -41,6 +41,19 @@ export interface DeliveryStatus {
   recipients: RecipientDelivery[]
 }
 export interface SendStatus { intent: SendIntent; delivery?: DeliveryStatus }
+
+export type ClassificationRuleType = 'FROM_ADDRESS' | 'FROM_DOMAIN' | 'SUBJECT_CONTAINS'
+export interface ClassificationRule {
+  id: string; categoryId: string; type: ClassificationRuleType; pattern: string; priority: number
+  autoApply: boolean; enabled: boolean; version: number; createdAt: string; updatedAt: string
+}
+export interface ClassificationSettings { algorithmEnabled: boolean; version: number; categoryAuto: Record<string, boolean> }
+export interface ClassificationSuggestion {
+  id: string; entryId: string; categoryId: string | null; source: 'RULE' | 'ALGORITHM'; status: string
+  confidence: number; margin: number; reason: string; ruleId?: string; ruleVersion?: number
+  modelVersion?: string; entryVersion: number; actionId?: string; createdAt: string
+}
+export interface ClassificationEvaluation { state: string; manual: boolean; suggestion: ClassificationSuggestion | null }
 
 export const folderLabels: Record<Folder, string> = {
   INBOX: '收件箱', SENT: '已发邮件', ARCHIVE: '归档', SPAM: '垃圾邮件', TRASH: '已删除',
