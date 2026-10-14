@@ -44,7 +44,9 @@ def main():
         page.on('request', lambda request: external.append(request.url) if not request.url.startswith('http://127.0.0.1:18080') else None)
         login(page, secrets['accounts']['alice']['address'], secrets['accounts']['alice']['password'])
         navigation_labels = ['写信', '收件箱', '已发邮件', '草稿箱', '归档', '垃圾邮件', '已删除']
-        navigation_visible = all(page.get_by_role('button', name=label, exact=True).count() == 1 for label in navigation_labels)
+        navigation = page.get_by_role('navigation').locator('.nav-item')
+        navigation_visible = all(navigation.filter(has_text=label).count() == 1 and
+                                 navigation.filter(has_text=label).is_visible() for label in navigation_labels)
         page.get_by_label('搜索邮件').fill(args.desktop_subject)
         page.get_by_role('button', name='搜索', exact=True).click()
         page.get_by_role('button').filter(has_text=args.desktop_subject).first.wait_for()

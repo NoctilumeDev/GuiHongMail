@@ -173,6 +173,12 @@ def snapshot():
     return {table: rows(f'SELECT * FROM {table} ORDER BY 1') for table in tables}
 
 
+def wait_classification_idle():
+    return wait_until('classification queue to settle', lambda: scalar(
+        "SELECT COUNT(*)=0 FROM mailbox_entries WHERE folder='INBOX' AND category_source IS NULL AND classification_checked_at IS NULL"),
+        timeout=40)
+
+
 def collect(out):
     source = git('rev-parse', 'HEAD')
     secrets = json.loads((lab.LAB / 'secrets.json').read_text(encoding='utf-8'))
@@ -323,6 +329,7 @@ def collect(out):
         headers={'Idempotency-Key': 'm4-reply-' + uuid.uuid4().hex}, expected=(202,))[2]
     reply_delivery = wait_delivery(bob, reply_intent['id']); reply_received = inbox_subject(alice, reply['subject'])
 
+    wait_classification_idle()
     before_restart = snapshot(); go_apps.stop(); go_apps.start(); after_restart = snapshot()
     manual_after_restart = evaluate(alice, training['alice'][0])
     classifier_processes = subprocess.check_output(['powershell', '-NoProfile', '-Command',
