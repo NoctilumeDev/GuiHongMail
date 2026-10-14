@@ -1,10 +1,13 @@
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
 import socket
+import sys
 import tempfile
 import threading
+import types
 import unittest
 from unittest.mock import patch
 
@@ -126,6 +129,22 @@ class LocalArtifactTest(unittest.TestCase):
                 run=lab.local_run('guihong-test-123',create=True)
                 self.assertEqual((root/'artifacts/local/guihong-test-123').resolve(),run.resolve())
                 with self.assertRaisesRegex(RuntimeError,'Invalid local run identity'):lab.local_run('../escape',create=True)
+
+
+class M6ScreenshotTest(unittest.TestCase):
+    def test_screenshot_uses_the_collector_subdirectory_and_rejects_escape(self):
+        package=types.ModuleType('veritrail');package.__path__=[]
+        canonical=types.ModuleType('veritrail.canonical');canonical.sha256_json=lambda value:'unused'
+        with patch.dict(sys.modules,{'veritrail':package,'veritrail.canonical':canonical}):
+            m6_round=importlib.import_module('m6_round')
+        with tempfile.TemporaryDirectory() as directory:
+            parent=Path(directory)/'run';image=parent/'browser-cancel/cancel.png'
+            image.parent.mkdir(parents=True);image.write_bytes(b'png')
+            observed=m6_round.screenshot(parent,Path('browser-cancel/cancel.png'))
+            self.assertEqual(hashlib.sha256(b'png').hexdigest(),observed['sha256'])
+            outside=parent.parent/'outside.png';outside.write_bytes(b'outside')
+            with self.assertRaisesRegex(RuntimeError,'screenshot is missing or empty'):
+                m6_round.screenshot(parent,Path('../outside.png'))
 
 
 class BrowserProbeTest(unittest.TestCase):

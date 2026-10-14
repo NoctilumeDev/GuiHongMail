@@ -79,7 +79,7 @@ def verified_build(source):
 
 
 def screenshot(parent, relative):
-    path = (parent / 'browser' / relative).resolve()
+    path = (parent / relative).resolve()
     if not path.is_file() or not path.is_relative_to(parent.resolve()) or path.stat().st_size == 0:
         raise RuntimeError('M6 screenshot is missing or empty')
     return {'name': relative, 'bytes': path.stat().st_size, 'sha256': digest(path)}
@@ -129,10 +129,14 @@ def main():
         raise RuntimeError('M6 round requires three distinct fresh labs')
     ports = {str(port): port_free(port) for port in (18080, 18081, 18082, 2526)}
     screenshots = [
-        screenshot(children['m3']['path'].parent, m3['browser']['cancel']['screenshot']),
-        screenshot(children['m3']['path'].parent, m3['browser']['unknown']['screenshot']),
-        screenshot(children['m4']['path'].parent, m4['browser']['desktop']['screenshot']),
-        screenshot(children['m4']['path'].parent, m4['browser']['mobile']['screenshot']),
+        screenshot(children['m3']['path'].parent,
+                   Path('browser-cancel') / m3['browser']['cancel']['screenshot']),
+        screenshot(children['m3']['path'].parent,
+                   Path('browser-unknown') / m3['browser']['unknown']['screenshot']),
+        screenshot(children['m4']['path'].parent,
+                   Path('browser') / m4['browser']['desktop']['screenshot']),
+        screenshot(children['m4']['path'].parent,
+                   Path('browser') / m4['browser']['mobile']['screenshot']),
     ]
     resources = [m3['resource'], m4['resource'], resilience['resource']]
     resource_ok = all(row['full_topology_samples'] >= (18 if index == 2 else 12) and
