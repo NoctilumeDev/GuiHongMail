@@ -113,6 +113,13 @@ class LocalArtifactTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError,'Invalid local run identity'):lab.local_run('../escape',create=True)
 
 
+class BrowserProbeTest(unittest.TestCase):
+    def test_m3_subject_locator_is_exact_after_classification_controls_are_present(self):
+        probe = (lab.ROOT / 'scripts/browser_m3.py').read_text(encoding='utf-8')
+        self.assertIn("get_by_role('textbox', name='主题', exact=True)", probe)
+        self.assertNotIn("get_by_label('主题')", probe)
+
+
 @unittest.skipUnless(os.name=='nt','Windows TCP ownership gate')
 class ConnectedPeerTest(unittest.TestCase):
     def test_unowned_connected_listener_receives_no_http_or_bearer_bytes(self):
