@@ -142,6 +142,8 @@ class M6ScreenshotTest(unittest.TestCase):
             image.parent.mkdir(parents=True);image.write_bytes(b'png')
             observed=m6_round.screenshot(parent,Path('browser-cancel/cancel.png'))
             self.assertEqual(hashlib.sha256(b'png').hexdigest(),observed['sha256'])
+            self.assertEqual('browser-cancel/cancel.png',observed['name'])
+            json.dumps(observed)
             outside=parent.parent/'outside.png';outside.write_bytes(b'outside')
             with self.assertRaisesRegex(RuntimeError,'screenshot is missing or empty'):
                 m6_round.screenshot(parent,Path('../outside.png'))
