@@ -25,6 +25,7 @@ var (
 	errNoJob       = errors.New("no delivery job")
 	errSendStarted = errors.New("send already started")
 	errBadDecision = errors.New("invalid delivery decision")
+	errStaleWorker = errors.New("stale delivery worker")
 	retryKey       = regexp.MustCompile(`^[\x21-\x7e]{1,128}$`)
 )
 
@@ -44,11 +45,11 @@ type sendEvent struct {
 }
 
 type claim struct {
-	JobID, ScopeID, IntentID, Sender, Recipient, RawSHA256, AttemptID string
-	RawSize, Epoch                                                    int64
-	AttemptCount                                                      int
-	DuplicateRisk                                                     bool
-	PriorAttempt                                                      sql.NullString
+	JobID, ScopeID, IntentID, Sender, Recipient, RawSHA256, AttemptID, WorkerID string
+	RawSize, Epoch                                                              int64
+	AttemptCount                                                                int
+	DuplicateRisk                                                               bool
+	PriorAttempt                                                                sql.NullString
 }
 
 type protocolResult struct {
@@ -68,8 +69,8 @@ func Run(ctx context.Context, runtime *platform.Runtime) error {
 	}
 	errorsChannel := make(chan error, 2)
 	go func() {
-		errorsChannel <- platform.Consume(ctx, runtime, "guihong_delivery_v1", sendTopic, func(callback context.Context, _ string, body []byte) error {
-			return acceptEvent(callback, runtime, body)
+		errorsChannel <- platform.Consume(ctx, runtime, "guihong_delivery_v1", sendTopic, func(callback context.Context, key string, body []byte) error {
+			return acceptEvent(callback, runtime, key, body)
 		})
 	}()
 	go func() { errorsChannel <- workerLoop(ctx, runtime) }()
@@ -81,22 +82,22 @@ func Run(ctx context.Context, runtime *platform.Runtime) error {
 	}
 }
 
-func acceptEvent(ctx context.Context, runtime *platform.Runtime, body []byte) error {
+func acceptEvent(ctx context.Context, runtime *platform.Runtime, key string, body []byte) error {
 	var event sendEvent
 	if err := json.Unmarshal(body, &event); err != nil || event.Version != 1 || event.SourceService != "mailbox" ||
 		!validUUID(event.IntentID) || !validUUID(event.DispatchScopeID) || len(event.RawSHA256) != 64 ||
 		event.RawSize < 1 || event.RawSize > 5*1024*1024 || len(event.Envelope) < 1 || len(event.Envelope) > 10 {
-		return fmt.Errorf("invalid send event")
+		return quarantineEvent(ctx, runtime, key, body, "INVALID_SEND_EVENT")
 	}
 	if address, err := mail.ParseAddress(event.Sender); err != nil || !strings.EqualFold(address.Address, event.Sender) {
-		return fmt.Errorf("invalid sender")
+		return quarantineEvent(ctx, runtime, key, body, "INVALID_SENDER")
 	}
 	recipients := make([]string, 0, len(event.Envelope))
 	seen := map[string]bool{}
 	for _, value := range event.Envelope {
 		address, err := mail.ParseAddress(value.Address)
 		if err != nil {
-			return fmt.Errorf("invalid recipient")
+			return quarantineEvent(ctx, runtime, key, body, "INVALID_RECIPIENT")
 		}
 		normalized := strings.ToLower(address.Address)
 		if !seen[normalized] {
@@ -142,6 +143,19 @@ func acceptEvent(ctx context.Context, runtime *platform.Runtime, body []byte) er
 	})
 }
 
+func quarantineEvent(ctx context.Context, runtime *platform.Runtime, key string, body []byte, reason string) error {
+	if len(body) > 5*1024*1024 {
+		body = body[:5*1024*1024]
+	}
+	payloadDigest := platform.SHA256(body)
+	keyDigest := platform.SHA256([]byte(key))
+	return runtime.Witness.Write(ctx, "delivery-quarantine|"+payloadDigest+"|"+reason, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO delivery_quarantine(payload_sha256,message_key_sha256,reason_code,byte_size) VALUES(?,?,?,?)
+			ON DUPLICATE KEY UPDATE observed_count=LEAST(observed_count+1,1000),last_seen_at=CURRENT_TIMESTAMP(6)`, payloadDigest, keyDigest, reason, len(body))
+		return err
+	})
+}
+
 func workerLoop(ctx context.Context, runtime *platform.Runtime) error {
 	worker := uuid.NewString()
 	ticker := time.NewTicker(200 * time.Millisecond)
@@ -157,7 +171,7 @@ func workerLoop(ctx context.Context, runtime *platform.Runtime) error {
 			}
 			if err == nil {
 				result := deliver(ctx, runtime, job)
-				if err := finish(ctx, runtime, job, result); err != nil {
+				if err := finish(ctx, runtime, job, result); err != nil && !errors.Is(err, errStaleWorker) {
 					return err
 				}
 				continue
@@ -201,6 +215,7 @@ func claimJob(ctx context.Context, runtime *platform.Runtime, worker string) (cl
 		result.AttemptCount++
 		result.Epoch++
 		result.AttemptID = uuid.NewString()
+		result.WorkerID = worker
 		var prior string
 		if err := tx.QueryRowContext(ctx, "SELECT attempt_id FROM delivery_attempts WHERE job_id=? AND outcome='UNKNOWN' ORDER BY epoch_no DESC LIMIT 1", result.JobID).Scan(&prior); err == nil {
 			result.DuplicateRisk = true
@@ -237,8 +252,15 @@ func recordStage(ctx context.Context, runtime *platform.Runtime, job claim, stag
 		if rows != 1 {
 			return fmt.Errorf("attempt is not active")
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE delivery_jobs SET lease_until=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 30 SECOND) WHERE job_id=? AND state='STARTED'`, job.JobID)
-		return err
+		lease, err := tx.ExecContext(ctx, `UPDATE delivery_jobs SET lease_until=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 30 SECOND) WHERE job_id=? AND state='STARTED' AND active_epoch=? AND worker_id=?`, job.JobID, job.Epoch, job.WorkerID)
+		if err != nil {
+			return err
+		}
+		rows, _ = lease.RowsAffected()
+		if rows != 1 {
+			return errStaleWorker
+		}
+		return nil
 	})
 }
 
@@ -360,11 +382,21 @@ func finish(ctx context.Context, runtime *platform.Runtime, job claim, result pr
 		if result.Code != 0 {
 			code = result.Code
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE delivery_attempts SET completed_at=CURRENT_TIMESTAMP(6),last_stage=?,data_submitted=?,smtp_code=?,outcome=?,evidence_sha256=? WHERE attempt_id=? AND completed_at IS NULL`, result.LastStage, result.DataSubmitted, code, result.Outcome, result.Evidence, job.AttemptID); err != nil {
+		attempt, err := tx.ExecContext(ctx, `UPDATE delivery_attempts SET completed_at=CURRENT_TIMESTAMP(6),last_stage=?,data_submitted=?,smtp_code=?,outcome=?,evidence_sha256=? WHERE attempt_id=? AND job_id=? AND epoch_no=? AND worker_id=? AND completed_at IS NULL`, result.LastStage, result.DataSubmitted, code, result.Outcome, result.Evidence, job.AttemptID, job.JobID, job.Epoch, job.WorkerID)
+		if err != nil {
 			return err
 		}
-		if _, err := tx.ExecContext(ctx, `UPDATE delivery_jobs SET state=?,next_attempt_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL ? SECOND),worker_id=NULL,lease_until=NULL WHERE job_id=? AND state='STARTED'`, state, nextDelay, job.JobID); err != nil {
+		rows, _ := attempt.RowsAffected()
+		if rows != 1 {
+			return errStaleWorker
+		}
+		jobUpdate, err := tx.ExecContext(ctx, `UPDATE delivery_jobs SET state=?,next_attempt_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL ? SECOND),worker_id=NULL,lease_until=NULL WHERE job_id=? AND state='STARTED' AND active_epoch=? AND worker_id=?`, state, nextDelay, job.JobID, job.Epoch, job.WorkerID)
+		if err != nil {
 			return err
+		}
+		rows, _ = jobUpdate.RowsAffected()
+		if rows != 1 {
+			return errStaleWorker
 		}
 		return reconcileScope(ctx, tx, job.ScopeID)
 	})
