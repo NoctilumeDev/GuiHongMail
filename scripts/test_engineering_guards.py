@@ -1,17 +1,19 @@
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
 import socket
+import sys
 import tempfile
 import threading
+import types
 import unittest
 from unittest.mock import patch
 
 import apps
 from evidence_summary import is_completed
 import lab
-import m6_round
 import resource_guard
 
 
@@ -131,6 +133,10 @@ class LocalArtifactTest(unittest.TestCase):
 
 class M6ScreenshotTest(unittest.TestCase):
     def test_screenshot_uses_the_collector_subdirectory_and_rejects_escape(self):
+        package=types.ModuleType('veritrail');package.__path__=[]
+        canonical=types.ModuleType('veritrail.canonical');canonical.sha256_json=lambda value:'unused'
+        with patch.dict(sys.modules,{'veritrail':package,'veritrail.canonical':canonical}):
+            m6_round=importlib.import_module('m6_round')
         with tempfile.TemporaryDirectory() as directory:
             parent=Path(directory)/'run';image=parent/'browser-cancel/cancel.png'
             image.parent.mkdir(parents=True);image.write_bytes(b'png')
