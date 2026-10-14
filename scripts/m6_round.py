@@ -82,7 +82,7 @@ def screenshot(parent, relative):
     path = (parent / relative).resolve()
     if not path.is_file() or not path.is_relative_to(parent.resolve()) or path.stat().st_size == 0:
         raise RuntimeError('M6 screenshot is missing or empty')
-    return {'name': relative, 'bytes': path.stat().st_size, 'sha256': digest(path)}
+    return {'name': Path(relative).as_posix(), 'bytes': path.stat().st_size, 'sha256': digest(path)}
 
 
 def owned_absent(identity):
