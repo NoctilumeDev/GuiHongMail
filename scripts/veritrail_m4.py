@@ -214,6 +214,17 @@ def collect(out):
     low = import_message(alice_id, secrets['accounts']['alice']['address'], 'mixed@mixed.test', 'alpha beta project travel brief notice')
     low_result = evaluate(alice, low)
 
+    # Decide algorithm suggestions before rule mutations intentionally withdraw and recompute pending suggestions.
+    accept_prediction, reject_prediction, override_prediction = predictions[0], predictions[1], predictions[2]
+    accepted = alice.json('POST', f"/api/mailbox/messages/{accept_prediction['entry']}/classification/decision",
+        {'suggestionId': accept_prediction['result']['suggestion']['id'], 'decision': 'ACCEPT',
+         'version': accept_prediction['result']['suggestion']['entryVersion']})[2]
+    rejected = alice.json('POST', f"/api/mailbox/messages/{reject_prediction['entry']}/classification/decision",
+        {'suggestionId': reject_prediction['result']['suggestion']['id'], 'decision': 'REJECT',
+         'version': reject_prediction['result']['suggestion']['entryVersion']})[2]
+    override_entry = {'entryId': override_prediction['entry']}
+    overridden = classify_manual(alice, override_entry, categories['alice_a']['id'])
+
     # Rule CRUD, conflict, manual precedence, default suggestion and explicit auto application.
     address_rule = rule(alice, categories['alice_a']['id'], 'FROM_ADDRESS', 'boss@rules.test', 600)
     domain_rule = rule(alice, categories['alice_a']['id'], 'FROM_DOMAIN', 'auto.rules', 850, True)
@@ -239,16 +250,7 @@ def collect(out):
     auto_rule_undone = alice.json('POST', f"/api/mailbox/messages/{auto_rule_entry['entryId']}/classification/undo",
         {'actionId': auto_rule_result['suggestion']['actionId'], 'version': auto_rule_detail['summary']['version']})[2]
 
-    # Suggestion decisions and algorithm auto authorization.
-    accept_prediction, reject_prediction, override_prediction = predictions[0], predictions[1], predictions[2]
-    accepted = alice.json('POST', f"/api/mailbox/messages/{accept_prediction['entry']}/classification/decision",
-        {'suggestionId': accept_prediction['result']['suggestion']['id'], 'decision': 'ACCEPT',
-         'version': accept_prediction['result']['suggestion']['entryVersion']})[2]
-    rejected = alice.json('POST', f"/api/mailbox/messages/{reject_prediction['entry']}/classification/decision",
-        {'suggestionId': reject_prediction['result']['suggestion']['id'], 'decision': 'REJECT',
-         'version': reject_prediction['result']['suggestion']['entryVersion']})[2]
-    override_entry = {'entryId': override_prediction['entry']}
-    overridden = classify_manual(alice, override_entry, categories['alice_a']['id'])
+    # Algorithm auto authorization.
     settings = alice.json('GET', '/api/mailbox/classification/settings')[2]
     auto_settings = alice.json('PUT', '/api/mailbox/classification/category-auto/' + categories['alice_a']['id'], {'enabled': True})[2]
     # The manual-precedence address rule would win for reports@alpha-a.test; disable it before algorithm-auto proof.
