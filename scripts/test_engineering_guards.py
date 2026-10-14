@@ -9,11 +9,20 @@ import unittest
 from unittest.mock import patch
 
 import apps
+from evidence_summary import is_completed
 import lab
 import resource_guard
 
 
 class ContainerBudgetTest(unittest.TestCase):
+    def test_startup_admission_uses_resource_contract_1_3_without_moving_runtime_limits(self):
+        self.assertEqual(2 * 1024**3, lab.STARTUP_FREE_BYTES)
+        contract = (lab.ROOT / 'docs/m1-resource-contract-1.3.md').read_text(encoding='utf-8')
+        self.assertIn('**2 GiB 空闲**', contract)
+        self.assertIn('14 GiB', contract)
+        self.assertIn('10%', contract)
+        self.assertIn('16 PID', contract)
+
     def test_docker_memory_units_are_converted_without_treating_host_total_as_container_use(self):
         self.assertEqual(313 * 1024**2 + int(.9 * 1024**2), resource_guard.parse_size('313.9MiB'))
         self.assertEqual(153300000, resource_guard.parse_size('153.3MB'))
@@ -103,6 +112,33 @@ class LocalArtifactTest(unittest.TestCase):
                 run=lab.local_run('guihong-test-123',create=True)
                 self.assertEqual((root/'artifacts/local/guihong-test-123').resolve(),run.resolve())
                 with self.assertRaisesRegex(RuntimeError,'Invalid local run identity'):lab.local_run('../escape',create=True)
+
+
+class BrowserProbeTest(unittest.TestCase):
+    def test_m3_subject_locator_is_exact_after_classification_controls_are_present(self):
+        probe = (lab.ROOT / 'scripts/browser_m3.py').read_text(encoding='utf-8')
+        self.assertIn("get_by_role('textbox', name='主题', exact=True)", probe)
+        self.assertNotIn("get_by_label('主题')", probe)
+
+
+class M5ChildSummaryTest(unittest.TestCase):
+    def test_object_summary_schema_is_accepted_but_conflicting_execution_is_rejected(self):
+        self.assertTrue(is_completed({'execution': 'COMPLETED'}))
+        self.assertTrue(is_completed({'execution_status': 'COMPLETED'}))
+        self.assertTrue(is_completed({'execution': 'COMPLETED', 'execution_status': 'COMPLETED'}))
+        self.assertFalse(is_completed({}))
+        self.assertFalse(is_completed({'execution': 'COMPLETED', 'execution_status': 'ERROR'}))
+
+
+class ObjectCollectorTest(unittest.TestCase):
+    def test_gc_failure_witness_is_created_after_the_protection_probe(self):
+        collector = (lab.ROOT / 'scripts/veritrail_objects.py').read_text(encoding='utf-8')
+        protection = collector.index("protected_gc=call('mailbox','/internal/storage/gc','POST')")
+        dedicated = collector.index("stage('mailbox','gc_failure'", protection)
+        failure = collector.index("gc_failure=call('mailbox','/internal/storage/gc','POST')", dedicated)
+        self.assertLess(protection, dedicated)
+        self.assertLess(dedicated, failure)
+        self.assertIn("hard('gc-bounded','gc/deleted_count',6)", collector)
 
 
 @unittest.skipUnless(os.name=='nt','Windows TCP ownership gate')

@@ -41,8 +41,8 @@ def main():
         'go_contract_sha256':sha((ROOT/'docs/m0.1-go-runtime.md').read_bytes()),
         'component_sha256':sha((ROOT/'docs/m1-components.md').read_bytes()),
         'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.1.md').read_bytes()),'proxy_port':23306,
-        'object_ids':{name:str(uuid.uuid4()) for name in ['mailbox','ingress','delivery','put_failure','rollback','unknown']}}
-    spec={'id':'objects-observation','contract':{'id':'guihong-objects','version':'1.1'},'evidence_type':'guihong.objects',
+        'object_ids':{name:str(uuid.uuid4()) for name in ['mailbox','ingress','delivery','put_failure','rollback','unknown','gc_failure']}}
+    spec={'id':'objects-observation','contract':{'id':'guihong-objects','version':'1.2'},'evidence_type':'guihong.objects',
         'coordinates':request,'projections':['source_sha','positive','put_failure','known_rollback','commit_unknown','gc','integrity','journal_recovery','final_cleanup'],
         'canonicalization_profile':'veritrail-json-c14n/1'}
     def hard(id,path,value):return {'id':id,'severity':'HARD','left':{'requirement_id':'objects','path':'/facts/'+path},'operator':'eq','right':value}
@@ -61,12 +61,13 @@ def main():
         hard('unknown-journal-binding','commit_unknown/journal_transaction_bound',True),hard('unknown-database-binding','commit_unknown/database_receipt_bound',True),
         hard('unknown-db-object','commit_unknown/database_state','LIVE'),hard('unknown-db-ref','commit_unknown/ref_count',1),hard('unknown-s3','commit_unknown/s3_http',200),hard('unknown-blocks','commit_unknown/readiness_after/http',503),
         hard('unknown-reconciles','commit_unknown/readiness_restart/http',200),hard('unknown-read','commit_unknown/read_after_restart_sha256',sha(('unknown|'+run+'|归鸿对象').encode())),hard('unknown-gc-protected','commit_unknown/current_object_protected',True),
-        hard('gc-failure','gc/failure_http',503),hard('gc-deleting','gc/state_after_failure','DELETING'),hard('gc-retry','gc/retry_http',200),hard('gc-bounded','gc/deleted_count',5),
+        hard('gc-failure','gc/failure_http',503),hard('gc-deleting','gc/state_after_failure','DELETING'),
+        hard('gc-deleting-count','gc/deleting_count',1),hard('gc-retry','gc/retry_http',200),hard('gc-bounded','gc/deleted_count',6),
         hard('corrupt-read','integrity/read_http',503),hard('corrupt-block','integrity/readiness_after/http',503),hard('corrupt-restore','integrity/readiness_restart/http',200),
         hard('journal-missing','journal_recovery/readiness_missing/http',503),hard('journal-restored','journal_recovery/readiness_restored/http',200),
         hard('cleanup-deref','final_cleanup/dereference_http',204),hard('cleanup-gc','final_cleanup/gc_http',200),
         hard('cleanup-state','final_cleanup/database_state','DELETED'),hard('cleanup-object','final_cleanup/s3_http',404)]
-    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-objects','version':2,
+    plan=seal_acceptance_plan({'plan_kind':'ACCEPTANCE','schema_version':'0.1','plan_id':'guihong-m1-objects','version':3,
         'subject':{'id':'guihong-m1-a05','version':source,'source_ref':'github:NoctilumeDev/GuiHongMail'},
         'question':'Do standard S3 application writes, refs, native commit ambiguity, bounded GC and recovery fail closed under the declared M1 mechanisms?',
         'governance':{'claim_owner_ref':'human:repository-owner','drafter_ref':'guihong:objects-collector','seal_authority_ref':'human:repository-owner:guihong-m1-m6-20261013','seal_decision':'CONFIRMED'},
@@ -180,6 +181,12 @@ def main():
         protected_gc=call('mailbox','/internal/storage/gc','POST')[1]['deleted']
         facts['commit_unknown']['current_object_protected']=request['object_ids']['unknown'] not in protected_gc
         facts['commit_unknown']['other_recovered_count']=len(protected_gc)
+        # Create the delete-failure witness only after the protection probe. This
+        # keeps service restart latency from aging the witness into that earlier GC.
+        gc_failure_payload=('gc_failure|'+run+'|归鸿对象').encode()
+        require_http('gc-failure stage',stage('mailbox','gc_failure',gc_failure_payload),200)
+        require_http('gc-failure reference',reference('mailbox','gc_failure'),200)
+        require_http('gc-failure dereference',dereference('mailbox','gc_failure'),204)
         # Wait for the approved grace without blocking status communication from the caller.
         grace_deadline=time.monotonic()+62
         while time.monotonic()<grace_deadline:
@@ -187,15 +194,21 @@ def main():
             time.sleep(2)
         # First GC delete fails and remains DELETING; restart makes the same operation reentrant.
         lab.compose(['stop','--timeout','20','seaweedfs'],capture=True);wait_port(19833,False)
-        gc_failure=call('mailbox','/internal/storage/gc','POST');oldest=request['object_ids']['mailbox'];after_failure=db('mailbox',oldest)
+        gc_failure=call('mailbox','/internal/storage/gc','POST')
+        mailbox_gc_names=('mailbox','put_failure','rollback','gc_failure')
+        after_failure_rows={name:db('mailbox',request['object_ids'][name]) for name in mailbox_gc_names}
+        deleting=[name for name,row in after_failure_rows.items() if row['database_state']=='DELETING']
         lab.compose(['up','-d','seaweedfs'],capture=True);wait_port(19833,True);time.sleep(2)
         gc_retry=call('mailbox','/internal/storage/gc','POST');deleted=list(gc_retry[1]['deleted'])
         for role in ('ingress','delivery'):
             role_gc=call(role,'/internal/storage/gc','POST');deleted.extend(role_gc[1]['deleted'])
-        expected_gc_ids={request['object_ids'][name] for name in ('mailbox','ingress','delivery','put_failure','rollback')}
-        own_deleted=[item for item in deleted if item in expected_gc_ids]
-        facts['gc']={'failure_http':gc_failure[0]['http'],'state_after_failure':after_failure['database_state'],'retry_http':gc_retry[0]['http'],
-            'deleted_count':len(own_deleted),'deleted_ids':own_deleted,'other_recovered_count':len(deleted)-len(own_deleted)}
+        expected_gc_ids={request['object_ids'][name] for name in ('mailbox','ingress','delivery','put_failure','rollback','gc_failure')}
+        all_deleted=[*protected_gc,*deleted]
+        own_deleted=sorted({item for item in all_deleted if item in expected_gc_ids})
+        facts['gc']={'failure_http':gc_failure[0]['http'],'state_after_failure':'DELETING' if len(deleting)==1 else 'AMBIGUOUS',
+            'deleting_count':len(deleting),'failure_object_sha256':sha(request['object_ids'][deleting[0]].encode()) if len(deleting)==1 else None,
+            'retry_http':gc_retry[0]['http'],'deleted_count':len(own_deleted),'deleted_ids':own_deleted,
+            'other_recovered_count':len(set(all_deleted))-len(own_deleted)}
         for role in lab.SERVICES:
             row=db(role,request['object_ids'][role]);facts['positive'][role]['database_state']=row['database_state'];facts['positive'][role]['s3_after_gc']=s3_get(role,row['object_key'])['http']
         for name in ('put_failure','rollback'):
@@ -233,8 +246,8 @@ def main():
     facts['source_sha']=git('rev-parse','HEAD');facts['source_clean']=not bool(git('status','--porcelain'));save(out/'facts.json',facts)
     metadata={'schema_version':'0.1','canonicalization_profile':'veritrail-json-c14n/1','plan_digest':plan['seal']['digest'],'observation_spec_digest':observation_spec_digest(spec),
         'request_seal_digest':sha256_json(request),'collection_session_id':run,'collector_role':'guihong-objects-collector','coverage':'COMPLETE' if status=='COMPLETED' else 'ERROR',
-        'normalization_semantics_version':'guihong-objects/1.2','facts_digest':sha256_json(facts)}
-    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-objects/1.2','captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
+        'normalization_semantics_version':'guihong-objects/1.3','facts_digest':sha256_json(facts)}
+    evidence={'schema_version':'0.1','evidence_type':spec['evidence_type'],'source':'guihong-objects/1.3','captured_at':datetime.now(timezone.utc).isoformat(),'facts':facts,'metadata':{'veritrail_observation':metadata}}
     save(out/'evidence.json',evidence)
     report=create_acceptance_bundle(plan=plan,evidence_paths=[out/'evidence.json'],output=out/'bundle',acceptance_id=run,execution_status=status)
     summary={'run_id':run,'source_sha':source,'execution':status,'verdict':report['verdict'],'boundary':facts['boundary'],'bundle':str(out/'bundle')};save(out/'summary.json',summary);print(json.dumps(summary))

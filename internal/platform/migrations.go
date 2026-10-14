@@ -64,6 +64,9 @@ func Migrations(role string) ([]Migration, error) {
 			`CREATE TABLE delivery_retry_requests (scope_id CHAR(36) NOT NULL, request_key VARCHAR(128) NOT NULL, recipient VARCHAR(254) NOT NULL, prior_attempt_id CHAR(36) NOT NULL, created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY(scope_id,request_key), FOREIGN KEY(scope_id) REFERENCES dispatch_scopes(scope_id), FOREIGN KEY(prior_attempt_id) REFERENCES delivery_attempts(attempt_id))`,
 			`CREATE TABLE delivery_events (source_service VARCHAR(32) NOT NULL, source_intent_id CHAR(36) NOT NULL, payload_sha256 CHAR(64) NOT NULL, processed_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), PRIMARY KEY(source_service,source_intent_id))`,
 		}})
+		result = append(result, Migration{Version: 3, Name: "delivery_quarantine", Statements: []string{
+			`CREATE TABLE delivery_quarantine (payload_sha256 CHAR(64) PRIMARY KEY, message_key_sha256 CHAR(64) NOT NULL, reason_code VARCHAR(64) NOT NULL, byte_size BIGINT NOT NULL, observed_count INT NOT NULL DEFAULT 1, first_seen_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6), last_seen_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6), CONSTRAINT quarantine_size CHECK(byte_size>=0 AND byte_size<=5242880), CONSTRAINT quarantine_count CHECK(observed_count BETWEEN 1 AND 1000))`,
+		}})
 	default:
 		return nil, fmt.Errorf("unknown migration role")
 	}

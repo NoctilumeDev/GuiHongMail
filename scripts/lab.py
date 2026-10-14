@@ -15,6 +15,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 LAB = ROOT / '.artifacts' / 'lab'
+STARTUP_FREE_BYTES = 2 * 1024**3
 SERVICES = ('mailbox', 'ingress', 'delivery')
 
 def _ordinary_directory(path,parent):
@@ -170,7 +171,7 @@ def main():
     state=load();assert_owned()
     if args.action=='up':
         snapshot=memory()
-        if snapshot['free_bytes']<4*1024**3 or snapshot['used_bytes']>14*1024**3:
+        if snapshot['free_bytes']<STARTUP_FREE_BYTES or snapshot['used_bytes']>14*1024**3:
             raise RuntimeError('Memory admission denied; leave other applications/resources untouched')
         if shutil.disk_usage(ROOT).free<10*1024**3:
             raise RuntimeError('Disk admission denied')

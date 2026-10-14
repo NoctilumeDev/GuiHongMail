@@ -32,7 +32,9 @@ def main():
         page.get_by_role('heading', name='收件箱').wait_for()
         page.get_by_role('button', name='写信').click()
         page.get_by_label('收件人').fill(f'{args.mode}-browser@test.invalid')
-        page.get_by_label('主题').fill('M3 browser ' + args.mode + ' ' + uuid.uuid4().hex[:8])
+        page.get_by_role('textbox', name='主题', exact=True).fill(
+            'M3 browser ' + args.mode + ' ' + uuid.uuid4().hex[:8]
+        )
         page.get_by_label('正文').fill('浏览器发送回执证据')
         page.get_by_role('button', name='发送', exact=True).click()
         page.get_by_role('heading', name='发送意图已耐久保存').wait_for()
