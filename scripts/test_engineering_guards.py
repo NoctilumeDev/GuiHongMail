@@ -11,6 +11,7 @@ from unittest.mock import patch
 import apps
 import lab
 import resource_guard
+import veritrail_m5
 
 
 class ContainerBudgetTest(unittest.TestCase):
@@ -118,6 +119,29 @@ class BrowserProbeTest(unittest.TestCase):
         probe = (lab.ROOT / 'scripts/browser_m3.py').read_text(encoding='utf-8')
         self.assertIn("get_by_role('textbox', name='主题', exact=True)", probe)
         self.assertNotIn("get_by_label('主题')", probe)
+
+
+class M5ChildSummaryTest(unittest.TestCase):
+    def test_object_summary_schema_is_accepted_but_conflicting_execution_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run = root / 'artifacts/local/run'
+            run.mkdir(parents=True)
+            facts = {'source_sha': 'source', 'cases': {'object': True}}
+            evidence = {
+                'facts': facts,
+                'metadata': {'veritrail_observation': {'facts_digest': veritrail_m5.sha256_json(facts)}},
+            }
+            (run / 'evidence.json').write_text(json.dumps(evidence), encoding='utf-8')
+            summary = {'source_sha': 'source', 'verdict': 'PASS', 'execution': 'COMPLETED', 'run_id': 'run'}
+            (run / 'summary.json').write_text(json.dumps(summary), encoding='utf-8')
+            with patch.object(veritrail_m5, 'ROOT', root):
+                loaded = veritrail_m5.load_child('artifacts/local/run/evidence.json', 'source')
+                self.assertEqual('run', loaded['summary']['run_id'])
+                summary['execution_status'] = 'ERROR'
+                (run / 'summary.json').write_text(json.dumps(summary), encoding='utf-8')
+                with self.assertRaisesRegex(RuntimeError, 'same-source completed PASS'):
+                    veritrail_m5.load_child('artifacts/local/run/evidence.json', 'source')
 
 
 @unittest.skipUnless(os.name=='nt','Windows TCP ownership gate')
