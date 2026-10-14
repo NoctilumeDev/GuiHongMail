@@ -4,6 +4,7 @@ go 1.27.2
 
 require (
 	github.com/apache/rocketmq-client-go/v2 v2.1.2
+	github.com/emersion/go-smtp v0.25.0
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/google/uuid v1.3.0
 	golang.org/x/crypto v0.58.0
@@ -11,6 +12,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.2.0 // indirect
+	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6 // indirect
 	github.com/emirpasic/gods v1.12.0 // indirect
 	github.com/golang/mock v1.3.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect

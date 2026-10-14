@@ -168,7 +168,7 @@ def frontend():
                      '.mobile-step-folders','.mobile-step-list','.mobile-step-reader'):
         if required not in css:errors.append('frontend layout contract missing '+required)
     app=(ROOT/'frontend/web/src/App.vue').read_text(encoding='utf-8')
-    for required in ('sandbox=""','发送（M3 开放）'):
+    for required in ('sandbox=""','SUBMITTED_LOCAL','确认可能重复并重试'):
         if required not in app:errors.append('frontend safety/route contract missing '+required)
     if errors:raise RuntimeError('\n'.join(errors))
     return {'runtime_dependencies':package['dependencies'],'lockfile_version':3,'navigation_entries':labels,'independent_scroll_regions':3}

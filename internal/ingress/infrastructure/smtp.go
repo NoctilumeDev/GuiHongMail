@@ -17,7 +17,7 @@ import (
 const maxSMTPLine = 1000
 
 func RunSMTP(ctx context.Context, runtime *platform.Runtime) error {
-	return runSMTP(ctx, runtime.Config.SMTPAddress, runtime.Writable)
+	return RunDurableSMTP(ctx, runtime)
 }
 
 func runSMTP(ctx context.Context, address string, writable func(context.Context) bool) error {

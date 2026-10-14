@@ -14,19 +14,20 @@ var BuildSource string
 var sourcePattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 type Config struct {
-	Role          string
-	SourceSHA     string
-	HTTPAddress   string
-	SMTPAddress   string
-	WitnessRoot   string
-	InternalToken string
-	DatabaseDSN   string
-	S3Endpoint    string
-	S3Bucket      string
-	S3Key         string
-	S3Secret      string
-	NameServer    string
-	Broker        string
+	Role           string
+	SourceSHA      string
+	HTTPAddress    string
+	SMTPAddress    string
+	WitnessRoot    string
+	InternalToken  string
+	InternalTokens map[string]string
+	DatabaseDSN    string
+	S3Endpoint     string
+	S3Bucket       string
+	S3Key          string
+	S3Secret       string
+	NameServer     string
+	Broker         string
 }
 
 func LoadConfig(role string) (Config, error) {
@@ -46,7 +47,8 @@ func LoadConfig(role string) (Config, error) {
 		return value, nil
 	}
 	values := make(map[string]string)
-	for _, name := range []string{"GUIHONG_WITNESS_ROOT", "GUIHONG_INTERNAL_TOKEN", "GUIHONG_DB_DSN",
+	for _, name := range []string{"GUIHONG_WITNESS_ROOT", "GUIHONG_INTERNAL_TOKEN",
+		"GUIHONG_INTERNAL_MAILBOX_TOKEN", "GUIHONG_INTERNAL_INGRESS_TOKEN", "GUIHONG_INTERNAL_DELIVERY_TOKEN", "GUIHONG_DB_DSN",
 		"GUIHONG_S3_ENDPOINT", "GUIHONG_S3_BUCKET", "GUIHONG_S3_KEY", "GUIHONG_S3_SECRET",
 		"GUIHONG_NAMESRV", "GUIHONG_BROKER"} {
 		value, err := required(name)
@@ -69,8 +71,11 @@ func LoadConfig(role string) (Config, error) {
 	}
 	return Config{
 		Role: role, SourceSHA: BuildSource, HTTPAddress: address, SMTPAddress: "127.0.0.1:12525",
-		WitnessRoot: root, InternalToken: values["GUIHONG_INTERNAL_TOKEN"], DatabaseDSN: values["GUIHONG_DB_DSN"],
-		S3Endpoint: values["GUIHONG_S3_ENDPOINT"], S3Bucket: values["GUIHONG_S3_BUCKET"],
+		WitnessRoot: root, InternalToken: values["GUIHONG_INTERNAL_TOKEN"],
+		InternalTokens: map[string]string{"mailbox": values["GUIHONG_INTERNAL_MAILBOX_TOKEN"],
+			"ingress": values["GUIHONG_INTERNAL_INGRESS_TOKEN"], "delivery": values["GUIHONG_INTERNAL_DELIVERY_TOKEN"]},
+		DatabaseDSN: values["GUIHONG_DB_DSN"],
+		S3Endpoint:  values["GUIHONG_S3_ENDPOINT"], S3Bucket: values["GUIHONG_S3_BUCKET"],
 		S3Key: values["GUIHONG_S3_KEY"], S3Secret: values["GUIHONG_S3_SECRET"],
 		NameServer: values["GUIHONG_NAMESRV"], Broker: values["GUIHONG_BROKER"],
 	}, nil

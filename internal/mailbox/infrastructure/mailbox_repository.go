@@ -36,6 +36,17 @@ func (r *MailboxRepository) AccountAddress(ctx context.Context, accountID string
 	}
 	return value, err
 }
+func (r *MailboxRepository) ReplyReference(ctx context.Context, accountID, contentID string) (string, error) {
+	var value sql.NullString
+	err := r.database.QueryRowContext(ctx, `SELECT c.message_id FROM message_contents c JOIN mailbox_entries e ON e.content_id=c.content_id WHERE e.account_id=? AND c.content_id=?`, accountID, contentID).Scan(&value)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", domain.ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return value.String, nil
+}
 func (r *MailboxRepository) ready(ctx context.Context) error {
 	if !r.Available(ctx) {
 		return fmt.Errorf("SERVICE_UNAVAILABLE")

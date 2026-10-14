@@ -18,6 +18,8 @@ GO = Path('D:/DevTools/Go/go1.27.2/bin/go.exe')
 NPM = Path('D:/Node.js/current/npm.cmd')
 PORTS = {'mailbox': 18080, 'ingress': 18081, 'delivery': 18082}
 COMMANDS = {'mailbox': './cmd/mailbox', 'ingress': './cmd/ingress', 'delivery': './cmd/delivery'}
+TOPICS = ('guihong_mail_send_v1', 'guihong_ingress_accepted_v1')
+CONSUMER_GROUPS = ('guihong_mailbox_import_v1', 'guihong_delivery_v1')
 PROCESSES = lab.LAB / 'go-applications'
 process_identity = apps.process_identity
 tcp_server_owners = apps.tcp_server_owners
@@ -243,8 +245,49 @@ def request(role, path, method='GET'):
     return json.loads(body)
 
 
-def start(database_ports=None):
+def ensure_mq_bindings():
+    state = lab.load()
+    candidates = subprocess.check_output(
+        [lab.docker(), 'ps', '-q', '--filter', 'label=com.docker.compose.project=' + state['id'],
+         '--filter', 'label=com.docker.compose.service=broker'], text=True, encoding='utf-8').split()
+    if len(candidates) != 1:
+        raise RuntimeError('Exact owned running RocketMQ broker is unavailable')
+    broker = candidates[0]
+    inspected = json.loads(subprocess.check_output(
+        [lab.docker(), 'inspect', broker], text=True, encoding='utf-8'))[0]
+    labels = inspected['Config'].get('Labels') or {}
+    if labels.get('guihong.owner') != state['id'] or labels.get('com.docker.compose.service') != 'broker':
+        raise RuntimeError('RocketMQ broker ownership changed before group provisioning')
+    log_path = PROCESSES / ('mq-bindings-' + uuid.uuid4().hex + '.log')
+    with log_path.open('xb') as output:
+        for topic in TOPICS:
+            result = subprocess.run(
+                [lab.docker(), 'exec', broker, '/home/rocketmq/rocketmq-5.5.0/bin/mqadmin',
+                 'updateTopic', '-n', 'namesrv:9876', '-b', '127.0.0.1:20911', '-t', topic,
+                 '-r', '1', '-w', '1'], stdout=output, stderr=subprocess.STDOUT, timeout=30)
+            if result.returncode:
+                raise RuntimeError('RocketMQ topic provisioning failed; retained ' + str(log_path))
+            result = subprocess.run(
+                [lab.docker(), 'exec', broker, '/home/rocketmq/rocketmq-5.5.0/bin/mqadmin',
+                 'topicRoute', '-n', 'namesrv:9876', '-t', topic],
+                stdout=output, stderr=subprocess.STDOUT, timeout=30)
+            if result.returncode:
+                raise RuntimeError('RocketMQ topic route readback failed; retained ' + str(log_path))
+        for group in CONSUMER_GROUPS:
+            result = subprocess.run(
+                [lab.docker(), 'exec', broker, '/home/rocketmq/rocketmq-5.5.0/bin/mqadmin',
+                 'updateSubGroup', '-n', 'namesrv:9876', '-b', '127.0.0.1:20911', '-g', group],
+                stdout=output, stderr=subprocess.STDOUT, timeout=30)
+            if result.returncode:
+                raise RuntimeError('RocketMQ consumer group provisioning failed; retained ' + str(log_path))
+    return log_path
+
+
+def start(database_ports=None, roles=None):
     lab.assert_owned()
+    roles = tuple(roles or lab.SERVICES)
+    if not roles or len(set(roles)) != len(roles) or any(role not in lab.SERVICES for role in roles):
+        raise RuntimeError('Invalid Go application role selection')
     if subprocess.check_output(['git', 'status', '--porcelain'], cwd=lab.ROOT):
         raise RuntimeError('Application startup requires committed clean source')
     if lab.memory()['used_bytes'] > 14 * 1024 ** 3:
@@ -254,7 +297,9 @@ def start(database_ports=None):
     credentials = private()
     database_ports = database_ports or {}
     PROCESSES.mkdir(exist_ok=True)
-    for role in lab.SERVICES:
+    group_log = ensure_mq_bindings()
+    print(json.dumps({'topics': list(TOPICS), 'consumer_groups': list(CONSUMER_GROUPS), 'log': str(group_log)}))
+    for role in roles:
         record = PROCESSES / (role + '.json')
         if record.exists():
             archive_inactive(record, role)
@@ -266,6 +311,9 @@ def start(database_ports=None):
         env = environment()
         env.update(GUIHONG_WITNESS_ROOT=str(lab.LAB / 'witness' / role),
                    GUIHONG_INTERNAL_TOKEN=credentials['internal'][role],
+                   GUIHONG_INTERNAL_MAILBOX_TOKEN=credentials['internal']['mailbox'],
+                   GUIHONG_INTERNAL_INGRESS_TOKEN=credentials['internal']['ingress'],
+                   GUIHONG_INTERNAL_DELIVERY_TOKEN=credentials['internal']['delivery'],
                    GUIHONG_DB_DSN=f"{database['user']}:{database['password']}@tcp(127.0.0.1:{database_ports.get(role, 13306)})/{database['schema']}?parseTime=true&timeout=3s&readTimeout=10s&writeTimeout=10s&interpolateParams=true",
                    GUIHONG_S3_ENDPOINT='http://127.0.0.1:19833', GUIHONG_S3_BUCKET=storage['bucket'],
                    GUIHONG_S3_KEY=storage['access_key'], GUIHONG_S3_SECRET=storage['secret_key'],
@@ -299,10 +347,15 @@ def start(database_ports=None):
             raise RuntimeError('Go application did not become identifiable within 60s')
 
 
-def stop():
+def stop(roles=None):
     if not PROCESSES.exists():
         return
+    roles = tuple(roles or lab.SERVICES)
+    if not roles or len(set(roles)) != len(roles) or any(role not in lab.SERVICES for role in roles):
+        raise RuntimeError('Invalid Go application role selection')
     for role in reversed(lab.SERVICES):
+        if role not in roles:
+            continue
         record = PROCESSES / (role + '.json')
         if not record.exists():
             continue
@@ -351,5 +404,11 @@ def status():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=['prepare', 'build', 'start', 'stop', 'status'])
+    parser.add_argument('--role', action='append', choices=lab.SERVICES)
     arguments = parser.parse_args()
-    globals()[arguments.action]()
+    if arguments.action in {'start', 'stop'}:
+        globals()[arguments.action](roles=arguments.role)
+    elif arguments.role:
+        raise RuntimeError('--role is only valid for start or stop')
+    else:
+        globals()[arguments.action]()

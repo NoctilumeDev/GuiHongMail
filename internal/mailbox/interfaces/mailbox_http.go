@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -254,6 +255,107 @@ func RegisterMailbox(mux *http.ServeMux, runtime *platform.Runtime, identity *ap
 	})))
 }
 
+func RegisterSend(mux *http.ServeMux, runtime *platform.Runtime, identity *application.Identity, sender *application.Sender, sends domain.SendRepository) {
+	read := func(handler http.HandlerFunc) http.Handler { return authenticated(identity, false, handler) }
+	write := func(handler http.HandlerFunc) http.Handler { return authenticated(identity, true, handler) }
+	mux.Handle("POST /api/mailbox/drafts/{draft}/send", write(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Version int64 `json:"version"`
+		}
+		if err := decode(r, &body); err != nil {
+			mailboxError(w, &domain.InvalidError{Code: "REQUEST_MALFORMED"})
+			return
+		}
+		value, err := sender.Submit(r.Context(), principal(r).AccountID, r.PathValue("draft"), body.Version, r.Header.Get("Idempotency-Key"))
+		mailboxResponse(w, value, err, http.StatusAccepted)
+	}))
+	mux.Handle("GET /api/mailbox/send-intents/{intent}", read(func(w http.ResponseWriter, r *http.Request) {
+		intent, err := sender.Intent(r.Context(), principal(r).AccountID, r.PathValue("intent"))
+		if err != nil {
+			mailboxError(w, err)
+			return
+		}
+		status, body, err := platform.InternalRequest(r.Context(), runtime, http.MethodGet, "http://127.0.0.1:18082/internal/dispatch-scopes/"+intent.DispatchScopeID, nil, 128*1024)
+		if err != nil || (status != http.StatusOK && status != http.StatusNotFound) {
+			mailboxError(w, errors.New("delivery status unavailable"))
+			return
+		}
+		response := map[string]any{"intent": intent}
+		if status == http.StatusOK {
+			var delivery any
+			if json.Unmarshal(body, &delivery) != nil {
+				mailboxError(w, errors.New("delivery status invalid"))
+				return
+			}
+			response["delivery"] = delivery
+		}
+		writeAPI(w, http.StatusOK, response)
+	}))
+	mux.Handle("POST /api/mailbox/send-intents/{intent}/cancel", write(func(w http.ResponseWriter, r *http.Request) {
+		forwardDeliveryDecision(w, r, runtime, sender, "/cancel", nil)
+	}))
+	mux.Handle("POST /api/mailbox/send-intents/{intent}/retry-unknown", write(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			ConfirmDuplicateRisk bool   `json:"confirmDuplicateRisk"`
+			Recipient            string `json:"recipient"`
+		}
+		if err := decode(r, &body); err != nil || !body.ConfirmDuplicateRisk {
+			mailboxError(w, &domain.InvalidError{Code: "DUPLICATE_RISK_CONFIRMATION_REQUIRED"})
+			return
+		}
+		forwardDeliveryDecision(w, r, runtime, sender, "/retry-unknown", map[string]any{"confirmDuplicateRisk": true, "recipient": body.Recipient, "requestKey": r.Header.Get("Idempotency-Key")})
+	}))
+	mux.Handle("GET /internal/admission", internal(runtime, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		account, err := sends.EnabledAccount(r.Context(), strings.ToLower(strings.TrimSpace(r.URL.Query().Get("address"))))
+		if err != nil {
+			mailboxError(w, err)
+			return
+		}
+		writeAPI(w, http.StatusOK, map[string]string{"accountId": account})
+	})))
+	mux.Handle("GET /internal/send-intents/{intent}/raw", internal(runtime, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		raw, digest, err := sender.Raw(r.Context(), r.PathValue("intent"))
+		if err != nil {
+			mailboxError(w, err)
+			return
+		}
+		w.Header().Set("Content-Type", "message/rfc822")
+		w.Header().Set("X-GuiHong-SHA256", digest)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(raw)
+	})))
+}
+
+func forwardDeliveryDecision(w http.ResponseWriter, r *http.Request, runtime *platform.Runtime, sender *application.Sender, suffix string, extra map[string]any) {
+	intent, err := sender.Intent(r.Context(), principal(r).AccountID, r.PathValue("intent"))
+	if err != nil {
+		mailboxError(w, err)
+		return
+	}
+	payload := map[string]any{"intentId": intent.ID, "rawSha256": intent.RawSHA256, "rawSize": intent.RawSize, "sender": intent.SenderAddress}
+	for key, value := range extra {
+		payload[key] = value
+	}
+	status, body, failure := platform.InternalRequest(r.Context(), runtime, http.MethodPost, "http://127.0.0.1:18082/internal/dispatch-scopes/"+intent.DispatchScopeID+suffix, payload, 128*1024)
+	if failure != nil {
+		mailboxError(w, failure)
+		return
+	}
+	if status == http.StatusConflict {
+		w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+		w.WriteHeader(status)
+		_, _ = w.Write(body)
+		return
+	}
+	if status < 200 || status >= 300 {
+		mailboxError(w, errors.New("delivery decision unavailable"))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
+	w.WriteHeader(status)
+	_, _ = w.Write(body)
+}
+
 func draftInput(body draftBody) domain.DraftInput {
 	return domain.DraftInput{Subject: body.Subject, TextBody: body.TextBody, HTMLBody: body.HTMLBody, To: body.To, CC: body.CC, BCC: body.BCC, Mode: body.Mode, SourceContentID: body.SourceContentID}
 }
@@ -285,6 +387,8 @@ func mailboxError(w http.ResponseWriter, err error) {
 		apiError(w, http.StatusBadRequest, invalid.Code)
 	case errors.As(err, &conflict):
 		writeAPI(w, http.StatusConflict, map[string]any{"code": "VERSION_CONFLICT", "current_version": conflict.Current})
+	case errors.Is(err, domain.ErrIdempotencyConflict):
+		apiError(w, http.StatusConflict, "IDEMPOTENCY_CONFLICT")
 	case errors.As(err, &unknown):
 		apiError(w, http.StatusServiceUnavailable, "COMMIT_OUTCOME_UNKNOWN")
 	default:

@@ -1,4 +1,4 @@
-import type { AuthResponse, Category, Draft, Folder, FolderCount, MessageDetail, MessageSummary, Page, User } from './model'
+import type { AuthResponse, Category, DeliveryStatus, Draft, Folder, FolderCount, MessageDetail, MessageSummary, Page, SendIntent, SendStatus, User } from './model'
 
 export class StaleResponseError extends Error { constructor() { super('STALE_RESPONSE') } }
 export class ApiError extends Error {
@@ -38,6 +38,12 @@ export class ApiClient {
   }
   deriveDraft(entryId: string, mode: string): Promise<Draft> { return this.request(`/api/mailbox/messages/${entryId}/drafts?mode=${encodeURIComponent(mode)}`, { method: 'POST' }) }
   async attach(draft: Draft, file: File): Promise<Draft> { const form = new FormData(); form.append('file', file); return this.request(`/api/mailbox/drafts/${draft.id}/attachments?version=${draft.version}`, { method: 'POST', body: form }, true, false) }
+  sendDraft(draft: Draft, key: string): Promise<SendIntent> { return this.request(`/api/mailbox/drafts/${draft.id}/send`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ version: draft.version }) }) }
+  sendStatus(intent: string): Promise<SendStatus> { return this.request(`/api/mailbox/send-intents/${intent}`) }
+  cancelSend(intent: string): Promise<DeliveryStatus> { return this.request(`/api/mailbox/send-intents/${intent}/cancel`, { method: 'POST' }) }
+  retryUnknown(intent: string, recipient: string, key: string): Promise<DeliveryStatus> {
+    return this.request(`/api/mailbox/send-intents/${intent}/retry-unknown`, { method: 'POST', headers: { 'Idempotency-Key': key }, body: JSON.stringify({ confirmDuplicateRisk: true, recipient }) })
+  }
 
   private async request<T>(path: string, init: RequestInit = {}, authenticated = true, json = true): Promise<T> {
     const observed = this.generation

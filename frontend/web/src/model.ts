@@ -22,6 +22,26 @@ export interface Draft {
 }
 export interface Page<T> { items: T[]; nextCursor: string | null }
 
+export interface SendIntent {
+  id: string; draftId: string; draftVersion: number; requestKey: string; payloadSha256: string
+  dispatchScopeId: string; contentId: string; rawSha256: string; rawSize: number; senderAddress: string
+  envelope: Array<{ kind: 'TO' | 'CC' | 'BCC'; address: string }>; state: 'SUBMITTED_LOCAL'; createdAt: string
+}
+export interface DeliveryAttempt {
+  id: string; epoch: number; lastStage: string; dataSubmitted: boolean; smtpCode: number | null
+  outcome: string | null; evidenceSha256: string | null; duplicateRiskAcknowledged: boolean
+  priorAttemptId: string | null; startedAt: string; completedAt: string | null
+}
+export interface RecipientDelivery {
+  id: string; recipient: string; state: 'QUEUED' | 'STARTED' | 'RETRY_WAIT' | 'NEXT_HOP_ACCEPTED' | 'PERMANENT_FAILURE' | 'UNKNOWN' | 'CANCELLED'
+  attemptCount: number; attempts: DeliveryAttempt[]
+}
+export interface DeliveryStatus {
+  id: string; intentId: string; state: 'QUEUED' | 'STARTED' | 'COMPLETED' | 'CANCELLED'; everStarted: boolean; version: number
+  recipients: RecipientDelivery[]
+}
+export interface SendStatus { intent: SendIntent; delivery?: DeliveryStatus }
+
 export const folderLabels: Record<Folder, string> = {
   INBOX: '收件箱', SENT: '已发邮件', ARCHIVE: '归档', SPAM: '垃圾邮件', TRASH: '已删除',
 }
