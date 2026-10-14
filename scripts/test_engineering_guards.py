@@ -11,6 +11,7 @@ from unittest.mock import patch
 import apps
 from evidence_summary import is_completed
 import lab
+import m6_round
 import resource_guard
 
 
@@ -126,6 +127,18 @@ class LocalArtifactTest(unittest.TestCase):
                 run=lab.local_run('guihong-test-123',create=True)
                 self.assertEqual((root/'artifacts/local/guihong-test-123').resolve(),run.resolve())
                 with self.assertRaisesRegex(RuntimeError,'Invalid local run identity'):lab.local_run('../escape',create=True)
+
+
+class M6ScreenshotTest(unittest.TestCase):
+    def test_screenshot_uses_the_collector_subdirectory_and_rejects_escape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent=Path(directory)/'run';image=parent/'browser-cancel/cancel.png'
+            image.parent.mkdir(parents=True);image.write_bytes(b'png')
+            observed=m6_round.screenshot(parent,Path('browser-cancel/cancel.png'))
+            self.assertEqual(hashlib.sha256(b'png').hexdigest(),observed['sha256'])
+            outside=parent.parent/'outside.png';outside.write_bytes(b'outside')
+            with self.assertRaisesRegex(RuntimeError,'screenshot is missing or empty'):
+                m6_round.screenshot(parent,Path('../outside.png'))
 
 
 class BrowserProbeTest(unittest.TestCase):
