@@ -9,9 +9,9 @@ import unittest
 from unittest.mock import patch
 
 import apps
+from evidence_summary import is_completed
 import lab
 import resource_guard
-import veritrail_m5
 
 
 class ContainerBudgetTest(unittest.TestCase):
@@ -123,25 +123,11 @@ class BrowserProbeTest(unittest.TestCase):
 
 class M5ChildSummaryTest(unittest.TestCase):
     def test_object_summary_schema_is_accepted_but_conflicting_execution_is_rejected(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            run = root / 'artifacts/local/run'
-            run.mkdir(parents=True)
-            facts = {'source_sha': 'source', 'cases': {'object': True}}
-            evidence = {
-                'facts': facts,
-                'metadata': {'veritrail_observation': {'facts_digest': veritrail_m5.sha256_json(facts)}},
-            }
-            (run / 'evidence.json').write_text(json.dumps(evidence), encoding='utf-8')
-            summary = {'source_sha': 'source', 'verdict': 'PASS', 'execution': 'COMPLETED', 'run_id': 'run'}
-            (run / 'summary.json').write_text(json.dumps(summary), encoding='utf-8')
-            with patch.object(veritrail_m5, 'ROOT', root):
-                loaded = veritrail_m5.load_child('artifacts/local/run/evidence.json', 'source')
-                self.assertEqual('run', loaded['summary']['run_id'])
-                summary['execution_status'] = 'ERROR'
-                (run / 'summary.json').write_text(json.dumps(summary), encoding='utf-8')
-                with self.assertRaisesRegex(RuntimeError, 'same-source completed PASS'):
-                    veritrail_m5.load_child('artifacts/local/run/evidence.json', 'source')
+        self.assertTrue(is_completed({'execution': 'COMPLETED'}))
+        self.assertTrue(is_completed({'execution_status': 'COMPLETED'}))
+        self.assertTrue(is_completed({'execution': 'COMPLETED', 'execution_status': 'COMPLETED'}))
+        self.assertFalse(is_completed({}))
+        self.assertFalse(is_completed({'execution': 'COMPLETED', 'execution_status': 'ERROR'}))
 
 
 class ObjectCollectorTest(unittest.TestCase):

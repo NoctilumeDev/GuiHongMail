@@ -11,6 +11,7 @@ from veritrail.acceptance_plan import observation_spec_digest, seal_acceptance_p
 from veritrail.acceptance_reporting import create_acceptance_bundle
 from veritrail.canonical import sha256_json
 
+from evidence_summary import is_completed
 import lab
 
 ROOT = lab.ROOT
@@ -36,9 +37,8 @@ def load_child(relative, source):
     facts = evidence.get('facts', {})
     summary_path = path.parent/'summary.json'
     summary = json.loads(summary_path.read_text(encoding='utf-8'))
-    execution_states = {summary[name] for name in ('execution_status', 'execution') if name in summary}
     if (facts.get('source_sha') != source or summary.get('source_sha') != source or
-            summary.get('verdict') != 'PASS' or execution_states != {'COMPLETED'}):
+            summary.get('verdict') != 'PASS' or not is_completed(summary)):
         raise RuntimeError('M5 child is not a same-source completed PASS: ' + relative)
     if evidence.get('metadata', {}).get('veritrail_observation', {}).get('facts_digest') != sha256_json(facts):
         raise RuntimeError('M5 child facts digest mismatch: ' + relative)
