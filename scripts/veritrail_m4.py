@@ -125,7 +125,7 @@ def mime(from_address, to_address, subject, body):
 
 def import_message(account_id, address, from_address, subject, body='M4 classification body'):
     raw = mime(from_address, address, subject, body)
-    value = internal('POST', '/internal/messages/import', {'base64': base64.b64encode(raw).decode(),
+    value = internal('POST', '/internal/mailbox/fixtures', {'base64': base64.b64encode(raw).decode(),
         'members': [{'accountId': account_id, 'folder': 'INBOX', 'read': False}]})
     entry = rows('SELECT entry_id,version_no FROM mailbox_entries WHERE account_id=%s AND content_id=%s', (account_id, value['content_id']))[0]
     return {'entryId': entry['entry_id'], 'version': entry['version_no'], 'rawSha256': hashlib.sha256(raw).hexdigest(), 'subject': subject}
