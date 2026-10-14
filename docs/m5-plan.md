@@ -1,6 +1,6 @@
 # M5 有限反例击打计划
 
-**状态：`SEALED_BEFORE_IMPLEMENTATION_OBSERVATION`。** M5 于 `2026-10-14T05:07:57.4464404Z` 从 main `d84e1384af64cca7f4f3c8ac93cdbfa1bd27eff5` 开工。本计划只具体化 A11–A16 和既有失败机制；不改变 M0 的邮件语义、状态所有权、三服务边界或 M1–M4 资格。资源执行采用 [合同 1.2](m1-resource-contract-1.2.md)。
+**状态：`RESEALED_BEFORE_RESOURCE_1_3_REQUALIFICATION`。** M5 于 `2026-10-14T05:07:57.4464404Z` 从 main `d84e1384af64cca7f4f3c8ac93cdbfa1bd27eff5` 开工；原 18 项计划及资源合同 1.2 候选均保留在 Git 历史和证据绑定中。项目所有者于 `2026-10-14T07:49:42.3361217Z` 授权把启动准入修订为[合同 1.3](m1-resource-contract-1.3.md)，本计划在新一轮观察前重新封存，18 项分母和所有运行停止线不变。它只具体化 A11–A16 和既有失败机制；不改变 M0 的邮件语义、状态所有权、三服务边界或 M1–M4 资格。
 
 ## 固定候选与执行纪律
 
@@ -36,7 +36,7 @@ M5-05、M5-06、M5-07 与 M5-05 内的重启/重放共同保留用户批准的�
 
 ## 资源、时间与退出
 
-- 完整三服务、四个中间件、受控下一跳和按需 Python 必须取得至少 18 个完整拓扑 5 秒样本，并覆盖 MQ 中断/恢复、lease 接管和快照隔离窗口。宿主持续占用、容器余量、PID、应用 RSS 与 OOM 按资源合同 1.2 判定。
+- 完整三服务、四个中间件、受控下一跳和按需 Python 必须取得至少 18 个完整拓扑 5 秒样本，并覆盖 MQ 中断/恢复、lease 接管和快照隔离窗口。宿主持续占用、容器余量、PID、应用 RSS 与 OOM 按资源合同 1.3 判定。
 - 每个故障等待有显式截止；SMTP 会话沿用 10 秒、lease 沿用 30 秒、4xx 沿用三次总 attempt。单个反例不得用无界 sleep、重试、队列或内存缓冲等待成功。
 - 最终候选另跑错 source/hash、错 Evidence 绑定与缺证据负控，必须得到声明的非 PASS。业务 `UNKNOWN` 可使对应正确性断言 PASS；资格 `PENDING/INCONCLUSIVE/NOT_PROVEN` 不得通过。
 - 18 项全过后仍需三项 CI、受保护合入、fresh exact-main 全量重建复验、负控、公开状态读回和 owned 清理，才可把 M5 标为 `QUALIFIED` 并进入 M6。

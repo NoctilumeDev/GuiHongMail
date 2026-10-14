@@ -282,7 +282,7 @@ def main():
     if args.facts_from and args.control=='none':raise RuntimeError('Reusing facts is limited to negative controls')
     source=git('rev-parse','HEAD');run='guihong-m5r-'+uuid.uuid4().hex;out=lab.local_run(run,create=True)
     request={'source_sha':source,'plan_sha256':sha((ROOT/'docs/m5-plan.md').read_bytes()),
-             'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.2.md').read_bytes()),
+             'resource_contract_sha256':sha((ROOT/'docs/m1-resource-contract-1.3.md').read_bytes()),
              'control':args.control,'facts_from':args.facts_from}
     spec={'id':'m5-resilience','contract':{'id':'guihong-m5-resilience','version':'1.0'},'evidence_type':'guihong.m5.resilience',
           'coordinates':request,'projections':['source_sha','cases','outbox','lease','lease_unknown','poison','snapshot','missing_witness','resource','boundary'],

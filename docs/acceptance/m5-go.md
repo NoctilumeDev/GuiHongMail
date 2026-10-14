@@ -14,6 +14,10 @@ Go 候选 `395426fc3e14104dea29ac2cffe82ca59c6c5a52` 于 `2026-10-14T15:42:27.39
 
 从资源修订和 M5 计划封存到本地聚合 PASS 的实际墙钟为 `02:34:30.0026321`。阶段内唯一人工介入是项目所有者授权 3 GiB 启动准入修订；没有以关闭应用、改资源硬线或手工修数据取得 PASS。
 
+## 资源合同 1.3 重开
+
+项目所有者于 `2026-10-14T07:49:42.3361217Z` 进一步授权把未取得资格阶段的完整实验启动准入从 3 GiB 改为 2 GiB。上面的本地 PASS 仍只证明 source `395426fc3e14104dea29ac2cffe82ca59c6c5a52` 与资源合同 1.2，不转写为新合同下的 PASS。资源合同 1.3 保持 14 GiB 三连停线和其他运行门禁，并要求新 source 重新取得五个子门、18 项聚合与负控。
+
 ## 保留的首败
 
 - `guihong-m5r-f533b09b6e904584a8ccc29eba3b5f4e` 为 9/10 FAIL：100 秒只取得 14 个完整样本；只把观察时长延长到 150 秒，18 样本分母和全部资源线不变。
@@ -24,4 +28,4 @@ Go 候选 `395426fc3e14104dea29ac2cffe82ca59c6c5a52` 于 `2026-10-14T15:42:27.39
 
 ## 资格边界
 
-当前结论仅为 `LOCAL_CANDIDATE_PASS / NOT_QUALIFIED`。仍需受保护 PR/CI、合入 main、fresh exact-main 重建、五个子门、聚合、负控和 owned 清理闭合，才可把 M5 标为 `QUALIFIED` 并开始 M6。
+当前结论为 `RESOURCE_CONTRACT_REOPENED / NOT_QUALIFIED`。资源合同 1.2 的 `LOCAL_CANDIDATE_PASS` 作为历史候选保留；仍需在 1.3 的新 source 上完成 PR/CI、合入 main、fresh exact-main 重建、五个子门、聚合、负控和 owned 清理，才可把 M5 标为 `QUALIFIED` 并开始 M6。

@@ -96,7 +96,7 @@ def main():
     if git('status','--porcelain'):raise RuntimeError('M5 aggregate requires committed clean exact source')
     source=git('rev-parse','HEAD');run='guihong-m5-'+uuid.uuid4().hex;out=lab.local_run(run,create=True)
     paths={name:getattr(args,name) for name in ('m2','m3','m4','objects','resilience')}
-    request={'source_sha':source,'plan_sha256':digest(ROOT/'docs/m5-plan.md'),'resource_contract_sha256':digest(ROOT/'docs/m1-resource-contract-1.2.md'),
+    request={'source_sha':source,'plan_sha256':digest(ROOT/'docs/m5-plan.md'),'resource_contract_sha256':digest(ROOT/'docs/m1-resource-contract-1.3.md'),
              'children':paths,'control':args.control}
     spec={'id':'m5-aggregate','contract':{'id':'guihong-m5-local','version':'1.0'},'evidence_type':'guihong.m5',
           'coordinates':request,'projections':['source_sha','cases','all_child_cases','object_lifecycle','resource_ok','resource','children','boundary'],

@@ -15,7 +15,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 LAB = ROOT / '.artifacts' / 'lab'
-STARTUP_FREE_BYTES = 3 * 1024**3
+STARTUP_FREE_BYTES = 2 * 1024**3
 SERVICES = ('mailbox', 'ingress', 'delivery')
 
 def _ordinary_directory(path,parent):

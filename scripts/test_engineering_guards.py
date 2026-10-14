@@ -15,10 +15,10 @@ import resource_guard
 
 
 class ContainerBudgetTest(unittest.TestCase):
-    def test_startup_admission_uses_resource_contract_1_2_without_moving_runtime_limits(self):
-        self.assertEqual(3 * 1024**3, lab.STARTUP_FREE_BYTES)
-        contract = (lab.ROOT / 'docs/m1-resource-contract-1.2.md').read_text(encoding='utf-8')
-        self.assertIn('**3 GiB 空闲**', contract)
+    def test_startup_admission_uses_resource_contract_1_3_without_moving_runtime_limits(self):
+        self.assertEqual(2 * 1024**3, lab.STARTUP_FREE_BYTES)
+        contract = (lab.ROOT / 'docs/m1-resource-contract-1.3.md').read_text(encoding='utf-8')
+        self.assertIn('**2 GiB 空闲**', contract)
         self.assertIn('14 GiB', contract)
         self.assertIn('10%', contract)
         self.assertIn('16 PID', contract)
