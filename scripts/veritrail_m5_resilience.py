@@ -136,7 +136,7 @@ def collect(out):
     m3.account('bob', secrets['accounts']['bob']['address'], secrets['accounts']['bob']['password'], '乙用户')
     alice = m3.API(); alice.login(secrets['accounts']['alice']['address'], secrets['accounts']['alice']['password'])
 
-    resource = subprocess.Popen([str(PYTHON), '-B', str(ROOT/'scripts/resource_guard.py'), '--duration', '100', '--runtime', 'go'],
+    resource = subprocess.Popen([str(PYTHON), '-B', str(ROOT/'scripts/resource_guard.py'), '--duration', '150', '--runtime', 'go'],
         cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
 
     # Durable Outbox survives a real broker pause and drains once without a second job.
@@ -183,7 +183,7 @@ def collect(out):
     valid_intent = m3.send(alice, valid_draft, 'm5-after-poison-' + uuid.uuid4().hex)
     valid_after_poison = m3.wait_scope(alice, valid_intent['id'], lambda scope: scope['state'] == 'COMPLETED', 'valid event after poison', 60)
 
-    resource_stdout, resource_stderr = resource.communicate(timeout=140)
+    resource_stdout, resource_stderr = resource.communicate(timeout=200)
     if resource.returncode:
         raise RuntimeError('resource guard stopped resilience run: ' + resource_stdout + resource_stderr)
     resource_result = json.loads(resource_stdout.strip().splitlines()[-1])
