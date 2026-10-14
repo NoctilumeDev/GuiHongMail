@@ -18,6 +18,16 @@ Go 候选 `395426fc3e14104dea29ac2cffe82ca59c6c5a52` 于 `2026-10-14T15:42:27.39
 
 项目所有者于 `2026-10-14T07:49:42.3361217Z` 进一步授权把未取得资格阶段的完整实验启动准入从 3 GiB 改为 2 GiB。上面的本地 PASS 仍只证明 source `395426fc3e14104dea29ac2cffe82ca59c6c5a52` 与资源合同 1.2，不转写为新合同下的 PASS。资源合同 1.3 保持 14 GiB 三连停线和其他运行门禁，并要求新 source 重新取得五个子门、18 项聚合与负控。
 
+## exact-main 资格
+
+[PR #14](https://github.com/NoctilumeDev/GuiHongMail/pull/14) 在资源合同 1.3 提交上通过 Go、静态合同与 Web 三项 CI，随后以 merge commit `b77cd819f94c7319dc74bf130e99f8ee63b9ee4d` 合入 main；同一提交的 [main CI](https://github.com/NoctilumeDev/GuiHongMail/actions/runs/38531212451) 三项再次通过。fresh detached worktree 实际确认 `HEAD == origin/main`，从锁文件重建 VeriTrail Core 0.13.0、收集器、前端依赖及三份 Go 二进制；构建回执 SHA-256 为 `f894ccb78d961ff70e55de5391423b44c5a2e9004e23e63c2aa196593af4356c`。
+
+同一 exact source 在五个 fresh owned lab 取得 M2 `guihong-m2-4c84b6d54fbe4ffe9ee5c5e238d62d22`、M3 `guihong-m3-5e56fe128ab94cfda9bbe8a5c18d4f55`、M4 `guihong-m4-022c779764f74b09b8c0e2d36c824e76`、对象生命周期 `guihong-objects-085fa4b314ba4857a8795a0f99e78337`、韧性 `guihong-m5r-4e8ac0bbbabb4d2da60fb8457cf93906` 五个 PASS。独立聚合 `guihong-m5-9bc902e597c1424bb393c01fdbcc8bd2` 为 `COMPLETED / PASS`，18 项全过；Plan 摘要 `b0d5070c1649fef7df47862179f89c447c82b257a6fcdc3e7a5ae5af9268b7b9`，事实摘要 `a8c30aef122f7d5f2ae4dc2a3bd27458f2ed3fa227ad03c7bf4f1db335679b4e`，请求摘要 `27a4fa4db71c3dac549386511a0ba0cdde2ea1a9d76ea0e52d7525116fdeb406`，bundle manifest SHA-256 为 `cab5de0bd604db9b4582f68d1cfaa68e97380396d0c6eccf23ab3a9d9bf8c228`。
+
+韧性资源窗取得 21 个完整拓扑样本，停止原因为空；宿主峰值 `13,877,383,168 bytes`，低于 14 GiB 停止线；Go 应用 RSS 峰值 `23,089,152 bytes`，容器最小内存余量 `23.87%`，最小 PID 余量 30。五轮启动前空闲量依次为 `6,098,563,072`、`3,489,071,104`、`3,849,228,288`、`4,374,609,920`、`4,008,759,296 bytes`；M3 的 `3,489,071,104 bytes` 低于旧 4 GiB 准入、但高于新 2 GiB 准入，并在完整运行门下 PASS，直接证明本次修订获得了真实可启动窗口。
+
+错误绑定负控 `guihong-m5-32d170aed38f462ba5302b164b7b44c5` 为 `COMPLETED / INCONCLUSIVE`，缺证据负控 `guihong-m5-aff8716e5ee0454ca78b6d23c0e90a4f` 为 `COMPLETED / PENDING`。五个 lab 的应用均正常停止，其 exact owned 容器、网络和三个卷读回均为零，private witness 与标准 evidence 保留在 ignored 归档。从 1.3 授权到 exact-main 聚合 PASS 的实际墙钟为 `00:43:38.792616`；除该具名授权外没有新增人工介入。
+
 ## 保留的首败
 
 - `guihong-m5r-f533b09b6e904584a8ccc29eba3b5f4e` 为 9/10 FAIL：100 秒只取得 14 个完整样本；只把观察时长延长到 150 秒，18 样本分母和全部资源线不变。
@@ -28,4 +38,4 @@ Go 候选 `395426fc3e14104dea29ac2cffe82ca59c6c5a52` 于 `2026-10-14T15:42:27.39
 
 ## 资格边界
 
-当前结论为 `RESOURCE_CONTRACT_REOPENED / NOT_QUALIFIED`。资源合同 1.2 的 `LOCAL_CANDIDATE_PASS` 作为历史候选保留；仍需在 1.3 的新 source 上完成 PR/CI、合入 main、fresh exact-main 重建、五个子门、聚合、负控和 owned 清理，才可把 M5 标为 `QUALIFIED` 并开始 M6。
+M5 在 `b77cd819f94c7319dc74bf130e99f8ee63b9ee4d` 取得 `QUALIFIED`。资源合同 1.2 的本地候选与首败保持历史绑定；资源合同 1.3 的 PR/CI、main CI、fresh exact-main 重建、五个子门、18 项聚合、负控和 owned 清理已经闭合。该资格只覆盖 M5 有限反例与恢复义务；M6 工程验收仍需独立施工和资格证据。
