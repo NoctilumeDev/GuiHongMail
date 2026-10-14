@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ApiClient, ApiError, StaleResponseError } from './api'
 import { navigation } from './navigation'
-import { folderLabels, type Category, type Draft, type Folder, type FolderCount, type MessageDetail, type MessageSummary, type RecipientDelivery, type SendStatus, type User } from './model'
+import { folderLabels, type Category, type ClassificationEvaluation, type ClassificationRule, type ClassificationRuleType, type ClassificationSettings, type Draft, type Folder, type FolderCount, type MessageDetail, type MessageSummary, type RecipientDelivery, type SendStatus, type User } from './model'
 
 const api = new ApiClient()
 const user = ref<User | null>(null)
@@ -18,6 +18,10 @@ const drafts = ref<Draft[]>([])
 const selected = ref<MessageDetail | null>(null)
 const editing = ref<Draft | null>(null)
 const sending = ref<SendStatus | null>(null)
+const rules = ref<ClassificationRule[]>([])
+const classificationSettings = ref<ClassificationSettings | null>(null)
+const classification = ref<ClassificationEvaluation | null>(null)
+const ruleDraft = reactive<{ categoryId: string; type: ClassificationRuleType; pattern: string; priority: number; autoApply: boolean }>({ categoryId: '', type: 'FROM_ADDRESS', pattern: '', priority: 100, autoApply: false })
 const activeFolder = ref<Folder>('INBOX')
 const activeCategory = ref<string | null>(null)
 const activeDrafts = ref(false)
@@ -45,6 +49,8 @@ function explain(failure: unknown): string {
     COMMIT_OUTCOME_UNKNOWN: '保存结果暂时无法确认，请先刷新核对，避免重复操作。', ATTACHMENT_TOTAL_EXCEEDED: '附件总量超过 4 MiB 或 20 个。',
 	IDEMPOTENCY_CONFLICT: '同一请求键对应了不同内容，已拒绝覆盖原发送意图。', SEND_ALREADY_STARTED: '邮件已进入 SMTP 发送流程，无法取消。',
 	UNKNOWN_RETRY_NOT_AUTHORIZED: '未找到可重试的 UNKNOWN，或重复风险确认无效。', DUPLICATE_RISK_CONFIRMATION_REQUIRED: '必须明确确认可能重复后才能重试。',
+	INVALID_CLASSIFICATION_RULE: '分类规则格式或优先级无效。', CLASSIFICATION_RULE_LIMIT: '分类规则已达到 100 条上限。',
+	SUGGESTION_ALREADY_DECIDED: '该建议已经处理，请重新打开邮件。', ACTION_SUPERSEDED: '邮件分类已有更新，不能撤销旧动作。',
   }
   return labels[failure.code] ?? `操作未完成（${failure.code}）。`
 }
@@ -58,18 +64,24 @@ async function signIn(): Promise<void> {
 }
 async function signOut(): Promise<void> {
   clearFeedback(); try { await api.logout() } catch (failure) { fail(failure) }
-  stopStatusPolling(); user.value = null; selected.value = null; editing.value = null; sending.value = null; messages.value = []; drafts.value = []; mobileStep.value = 'folders'
+  stopStatusPolling(); user.value = null; selected.value = null; editing.value = null; sending.value = null; classification.value = null; rules.value = []; classificationSettings.value = null; messages.value = []; drafts.value = []; mobileStep.value = 'folders'
 }
 async function enterMailbox(): Promise<void> {
   await refreshSidebar()
+  await loadClassificationConfig()
   if (isMobile.value) { history.replaceState({ step: 'folders' }, '', location.href); await openFolder('INBOX', true) }
   else await openFolder('INBOX', false)
+}
+async function loadClassificationConfig(): Promise<void> {
+  const [nextRules, nextSettings] = await Promise.all([api.classificationRules(), api.classificationSettings()])
+  rules.value = nextRules; classificationSettings.value = nextSettings
+  if (!ruleDraft.categoryId && categories.value[0]) ruleDraft.categoryId = categories.value[0].id
 }
 async function refreshSidebar(): Promise<void> {
   const [nextCounts, nextCategories] = await Promise.all([api.folders(), api.categories()]); counts.value = nextCounts; categories.value = nextCategories
 }
 async function openFolder(folder: Folder, push = true): Promise<void> {
-  clearFeedback(); viewSequence += 1; activeFolder.value = folder; activeCategory.value = null; activeDrafts.value = false; selected.value = null; editing.value = null; mobileStep.value = 'list'; await loadList(push)
+  clearFeedback(); viewSequence += 1; activeFolder.value = folder; activeCategory.value = null; activeDrafts.value = false; selected.value = null; editing.value = null; classification.value = null; mobileStep.value = 'list'; await loadList(push)
 }
 async function openDrafts(push = true): Promise<void> {
   clearFeedback(); viewSequence += 1; activeDrafts.value = true; activeCategory.value = null; selected.value = null; editing.value = null; mobileStep.value = 'list'
@@ -92,7 +104,10 @@ async function openMessage(item: MessageSummary, push = true): Promise<void> {
     let detail = await api.message(item.entryId)
     if (!detail.summary.read) detail = await api.changeMessage(item.entryId, { version: detail.summary.version, read: true })
     if (sequence !== viewSequence) return
-    selected.value = detail; mobileStep.value = 'reader'; replaceSummary(detail.summary); await refreshSidebar(); if (push) pushHistory('reader')
+    let result = await api.classification(item.entryId)
+    if (result.state === 'AUTO_APPLIED') detail = await api.message(item.entryId)
+    if (sequence !== viewSequence) return
+    selected.value = detail; classification.value = result; mobileStep.value = 'reader'; replaceSummary(detail.summary); await refreshSidebar(); if (push) pushHistory('reader')
   } catch (failure) { fail(failure) } finally { loading.value = false }
 }
 async function openDraft(item: Draft, push = true): Promise<void> {
@@ -177,16 +192,61 @@ async function changeRead(read: boolean): Promise<void> {
 }
 async function assignCategory(event: Event): Promise<void> {
   if (!selected.value) return; const value = (event.target as HTMLSelectElement).value; clearFeedback()
-  try { const body = value ? { version: selected.value.summary.version, categoryId: value } : { version: selected.value.summary.version, clearCategory: true }; selected.value = await api.changeMessage(selected.value.summary.entryId, body); replaceSummary(selected.value.summary); await refreshSidebar() }
+  try { const body = value ? { version: selected.value.summary.version, categoryId: value } : { version: selected.value.summary.version, clearCategory: true }; selected.value = await api.changeMessage(selected.value.summary.entryId, body); classification.value = { state: 'MANUAL_LOCKED', manual: true, suggestion: null }; replaceSummary(selected.value.summary); await refreshSidebar() }
   catch (failure) { fail(failure) }
 }
 async function addCategory(): Promise<void> {
   const name = window.prompt('分类名称（最多 40 字）')?.trim(); if (!name) return
-  try { await api.createCategory(name); await refreshSidebar() } catch (failure) { fail(failure) }
+  try { await api.createCategory(name); await refreshSidebar(); if (!ruleDraft.categoryId && categories.value[0]) ruleDraft.categoryId = categories.value[0].id } catch (failure) { fail(failure) }
 }
 async function removeCategory(category: Category): Promise<void> {
   if (!window.confirm(`删除分类“${category.name}”？邮件不会被删除或移动。`)) return
-  try { await api.deleteCategory(category); if (activeCategory.value === category.id) await openFolder('INBOX'); await refreshSidebar() } catch (failure) { fail(failure) }
+  try { await api.deleteCategory(category); if (activeCategory.value === category.id) await openFolder('INBOX'); await refreshSidebar(); await loadClassificationConfig() } catch (failure) { fail(failure) }
+}
+async function addRule(): Promise<void> {
+  const pattern = ruleDraft.pattern.trim(); if (!ruleDraft.categoryId || !pattern) return
+  clearFeedback()
+  try {
+    await api.createClassificationRule({ ...ruleDraft, pattern, enabled: true })
+    ruleDraft.pattern = ''; await loadClassificationConfig(); notice.value = '分类规则已保存。'
+  } catch (failure) { fail(failure) }
+}
+async function updateRule(rule: ClassificationRule, changes: Partial<ClassificationRule>): Promise<void> {
+  clearFeedback()
+  try { await api.updateClassificationRule({ ...rule, ...changes }); await loadClassificationConfig() } catch (failure) { fail(failure) }
+}
+async function removeRule(rule: ClassificationRule): Promise<void> {
+  clearFeedback(); try { await api.deleteClassificationRule(rule); await loadClassificationConfig() } catch (failure) { fail(failure) }
+}
+async function toggleAlgorithm(): Promise<void> {
+  if (!classificationSettings.value) return
+  clearFeedback(); try { classificationSettings.value = await api.setAlgorithmEnabled(classificationSettings.value, !classificationSettings.value.algorithmEnabled) } catch (failure) { fail(failure) }
+}
+async function toggleCategoryAuto(category: Category, enabled: boolean): Promise<void> {
+  clearFeedback(); try { classificationSettings.value = await api.setCategoryAuto(category.id, enabled) } catch (failure) { fail(failure) }
+}
+function categoryName(id: string | null | undefined): string { return categories.value.find(item => item.id === id)?.name ?? '未知分类' }
+function setCategoryAutoFromEvent(category: Category, event: Event): void { void toggleCategoryAuto(category, (event.target as HTMLInputElement).checked) }
+function setRulePriority(rule: ClassificationRule, event: Event): void {
+  const priority = Number((event.target as HTMLInputElement).value)
+  if (Number.isInteger(priority)) void updateRule(rule, { priority })
+}
+async function decideClassification(decision: 'ACCEPT' | 'REJECT'): Promise<void> {
+  if (!selected.value || !classification.value?.suggestion) return
+  const entry = selected.value.summary.entryId; const suggestion = classification.value.suggestion; clearFeedback()
+  try {
+    const result = await api.decideClassification(entry, suggestion.id, decision, selected.value.summary.version)
+    classification.value = { state: decision === 'ACCEPT' ? 'MANUAL_LOCKED' : 'REJECTED', manual: decision === 'ACCEPT', suggestion: result }
+    if (decision === 'ACCEPT') { selected.value = await api.message(entry); replaceSummary(selected.value.summary); await refreshSidebar() }
+    notice.value = decision === 'ACCEPT' ? '建议已确认并锁定为人工分类。' : '建议已拒绝，不会作为正样本。'
+  } catch (failure) { fail(failure) }
+}
+async function undoClassification(): Promise<void> {
+  const action = classification.value?.suggestion?.actionId
+  if (!selected.value || !action) return
+  clearFeedback()
+  try { selected.value = await api.undoClassification(selected.value.summary.entryId, action, selected.value.summary.version); replaceSummary(selected.value.summary); classification.value = { state: 'UNDONE', manual: false, suggestion: null }; await refreshSidebar(); notice.value = '自动分类已撤销，后续人工操作不会被覆盖。' }
+  catch (failure) { fail(failure) }
 }
 function replaceSummary(value: MessageSummary): void { const index = messages.value.findIndex(item => item.entryId === value.entryId); if (index >= 0) messages.value.splice(index, 1, value) }
 function activate(item: (typeof navigation)[number]): void { if (item.id === 'compose') void compose(); else if (item.id === 'drafts') void openDrafts(); else if (item.folder) void openFolder(item.folder) }
@@ -240,6 +300,30 @@ onBeforeUnmount(() => { stopStatusPolling(); window.removeEventListener('popstat
             <button type="button" class="nav-item" :class="{ active: activeCategory === category.id }" @click="openCategory(category)"><span class="nav-glyph">类</span><span class="nav-label">{{ category.name }}</span><span v-if="category.unread" class="badge">{{ category.unread }}</span></button>
             <button class="category-delete nav-label" type="button" @click="removeCategory(category)" :aria-label="`删除分类 ${category.name}`">×</button>
           </div>
+          <details class="classification-tools nav-label">
+            <summary>智能分类设置</summary>
+            <label class="switch-line"><input type="checkbox" :checked="classificationSettings?.algorithmEnabled" @change="toggleAlgorithm" />启用本地算法</label>
+            <p class="setting-note">算法仅接收本账户的发件地址、域名和主题散列特征。</p>
+            <form class="rule-form" @submit.prevent="addRule">
+              <label>目标分类<select v-model="ruleDraft.categoryId" required><option value="" disabled>选择分类</option><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
+              <label>匹配字段<select v-model="ruleDraft.type"><option value="FROM_ADDRESS">发件地址精确匹配</option><option value="FROM_DOMAIN">发件域精确匹配</option><option value="SUBJECT_CONTAINS">主题包含</option></select></label>
+              <label>匹配值<input v-model="ruleDraft.pattern" maxlength="254" required /></label>
+              <label>优先级<input v-model.number="ruleDraft.priority" type="number" min="0" max="1000" required /></label>
+              <label class="switch-line"><input v-model="ruleDraft.autoApply" type="checkbox" />命中后自动分类</label>
+              <button type="submit" :disabled="!categories.length">保存规则</button>
+            </form>
+            <article v-for="rule in rules" :key="rule.id" class="rule-row">
+              <strong>{{ categoryName(rule.categoryId) }}</strong><span>{{ rule.type }} · {{ rule.pattern }}</span>
+              <label>优先级<input type="number" min="0" max="1000" :value="rule.priority" @change="setRulePriority(rule, $event)" /></label>
+              <label class="switch-line"><input type="checkbox" :checked="rule.enabled" @change="updateRule(rule, { enabled: !rule.enabled })" />启用</label>
+              <label class="switch-line"><input type="checkbox" :checked="rule.autoApply" @change="updateRule(rule, { autoApply: !rule.autoApply })" />自动应用</label>
+              <button type="button" @click="removeRule(rule)">删除规则</button>
+            </article>
+            <div v-if="categories.length" class="auto-categories">
+              <p>算法自动采纳（按分类显式授权）</p>
+              <label v-for="category in categories" :key="category.id" class="switch-line"><input type="checkbox" :checked="classificationSettings?.categoryAuto[category.id] ?? false" @change="setCategoryAutoFromEvent(category, $event)" />{{ category.name }}</label>
+            </div>
+          </details>
         </nav>
       </aside>
 
@@ -263,6 +347,19 @@ onBeforeUnmount(() => { stopStatusPolling(); window.removeEventListener('popstat
           <header class="mail-header"><p class="eyebrow">{{ folderLabels[selected.summary.folder] }}</p><h1>{{ selected.summary.subject || '（无主题）' }}</h1><p><strong>{{ selected.summary.fromName || selected.summary.fromAddress }}</strong> &lt;{{ selected.summary.fromAddress }}&gt;</p><p class="recipients">收件人：{{ selected.recipients.filter(r => r.kind === 'TO').map(r => r.address).join(', ') || '未提供' }}</p><time>{{ new Date(selected.summary.sentAt || selected.summary.receivedAt).toLocaleString('zh-CN') }}</time>
             <label class="category-select">分类<select :value="selected.summary.categoryId || ''" @change="assignCategory"><option value="">未分类</option><option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option></select></label>
           </header>
+          <section v-if="classification" class="classification-card" :class="`classification-${classification.state.toLowerCase()}`" aria-label="分类建议">
+            <p class="eyebrow">CLASSIFICATION · {{ classification.state }}</p>
+            <template v-if="classification.suggestion">
+              <h2>{{ classification.suggestion.categoryId ? categoryName(classification.suggestion.categoryId) : '未自动选择分类' }}</h2>
+              <p>{{ classification.suggestion.reason }}</p>
+              <p v-if="classification.suggestion.source === 'ALGORITHM' && classification.suggestion.status !== 'UNKNOWN'" class="classification-score">置信度 {{ Math.round(classification.suggestion.confidence * 100) }}% · 领先 {{ Math.round(classification.suggestion.margin * 100) }}%</p>
+              <div v-if="classification.suggestion.status === 'PENDING'" class="classification-actions"><button type="button" @click="decideClassification('ACCEPT')">接受并人工锁定</button><button type="button" @click="decideClassification('REJECT')">拒绝建议</button></div>
+              <div v-else-if="classification.state === 'AUTO_APPLIED' && classification.suggestion.actionId" class="classification-actions"><button type="button" @click="undoClassification">撤销本次自动分类</button></div>
+            </template>
+            <p v-else-if="classification.manual">人工分类已锁定；规则、重训和自动采纳不会覆盖。</p>
+            <p v-else-if="classification.state === 'ALGORITHM_DISABLED'">本地算法已关闭；人工分类和显式规则仍然有效。</p>
+            <p v-else-if="classification.state === 'UNDONE'">本次自动分类已经撤销。</p>
+          </section>
           <iframe v-if="selected.safeHtml" class="safe-mail" sandbox="" title="经过安全清理的邮件正文" :srcdoc="selected.safeHtml"></iframe><pre v-else class="plain-mail">{{ selected.textBody }}</pre>
           <section v-if="selected.attachments.length" class="attachments" aria-label="附件"><h2>附件</h2><a v-for="attachment in selected.attachments" :key="attachment.id" :href="`/api/mailbox/messages/${selected.summary.entryId}/attachments/${attachment.id}`">{{ attachment.fileName }} · {{ Math.ceil(attachment.size / 1024) }} KiB</a></section>
         </section>

@@ -255,6 +255,102 @@ func RegisterMailbox(mux *http.ServeMux, runtime *platform.Runtime, identity *ap
 	})))
 }
 
+func RegisterClassification(mux *http.ServeMux, identity *application.Identity, classifier *application.Classifier) {
+	read := func(handler http.HandlerFunc) http.Handler { return authenticated(identity, false, handler) }
+	write := func(handler http.HandlerFunc) http.Handler { return authenticated(identity, true, handler) }
+	mux.Handle("GET /api/mailbox/classification/rules", read(func(w http.ResponseWriter, r *http.Request) {
+		value, err := classifier.Rules(r.Context(), principal(r).AccountID)
+		mailboxResponse(w, value, err, http.StatusOK)
+	}))
+	mux.Handle("POST /api/mailbox/classification/rules", write(func(w http.ResponseWriter, r *http.Request) {
+		var body domain.ClassificationRule
+		if err := decode(r, &body); err != nil {
+			mailboxError(w, &domain.InvalidError{Code: "REQUEST_MALFORMED"})
+			return
+		}
+		value, err := classifier.CreateRule(r.Context(), principal(r).AccountID, body)
+		mailboxResponse(w, value, err, http.StatusCreated)
+	}))
+	mux.Handle("PUT /api/mailbox/classification/rules/{rule}", write(func(w http.ResponseWriter, r *http.Request) {
+		var body domain.ClassificationRule
+		if err := decode(r, &body); err != nil {
+			mailboxError(w, &domain.InvalidError{Code: "REQUEST_MALFORMED"})
+			return
+		}
+		body.ID = r.PathValue("rule")
+		value, err := classifier.UpdateRule(r.Context(), principal(r).AccountID, body)
+		mailboxResponse(w, value, err, http.StatusOK)
+	}))
+	mux.Handle("DELETE /api/mailbox/classification/rules/{rule}", write(func(w http.ResponseWriter, r *http.Request) {
+		version, err := queryInt64(r, "version")
+		if err != nil {
+			mailboxError(w, &domain.InvalidError{Code: "INVALID_VERSION"})
+			return
+		}
+		if err = classifier.DeleteRule(r.Context(), principal(r).AccountID, r.PathValue("rule"), version); err != nil {
+			mailboxError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	mux.Handle("GET /api/mailbox/classification/settings", read(func(w http.ResponseWriter, r *http.Request) {
+		value, err := classifier.Settings(r.Context(), principal(r).AccountID)
+		mailboxResponse(w, value, err, http.StatusOK)
+	}))
+	mux.Handle("PUT /api/mailbox/classification/settings", write(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Version          int64 `json:"version"`
+			AlgorithmEnabled bool  `json:"algorithmEnabled"`
+		}
+		if err := decode(r, &body); err != nil {
+			mailboxError(w, &domain.InvalidError{Code: "REQUEST_MALFORMED"})
+			return
+		}
+		value, err := classifier.SetAlgorithmEnabled(r.Context(), principal(r).AccountID, body.Version, body.AlgorithmEnabled)
+		mailboxResponse(w, value, err, http.StatusOK)
+	}))
+	mux.Handle("PUT /api/mailbox/classification/category-auto/{category}", write(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := decode(r, &body); err != nil {
+			mailboxError(w, &domain.InvalidError{Code: "REQUEST_MALFORMED"})
+			return
+		}
+		value, err := classifier.SetCategoryAuto(r.Context(), principal(r).AccountID, r.PathValue("category"), body.Enabled)
+		mailboxResponse(w, value, err, http.StatusOK)
+	}))
+	mux.Handle("GET /api/mailbox/messages/{entry}/classification", read(func(w http.ResponseWriter, r *http.Request) {
+		value, err := classifier.Evaluate(r.Context(), principal(r).AccountID, r.PathValue("entry"))
+		mailboxResponse(w, value, err, http.StatusOK)
+	}))
+	mux.Handle("POST /api/mailbox/messages/{entry}/classification/decision", write(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			SuggestionID string `json:"suggestionId"`
+			Decision     string `json:"decision"`
+			Version      int64  `json:"version"`
+		}
+		if err := decode(r, &body); err != nil {
+			mailboxError(w, &domain.InvalidError{Code: "REQUEST_MALFORMED"})
+			return
+		}
+		value, err := classifier.Decide(r.Context(), principal(r).AccountID, r.PathValue("entry"), body.SuggestionID, body.Decision, body.Version)
+		mailboxResponse(w, value, err, http.StatusOK)
+	}))
+	mux.Handle("POST /api/mailbox/messages/{entry}/classification/undo", write(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			ActionID string `json:"actionId"`
+			Version  int64  `json:"version"`
+		}
+		if err := decode(r, &body); err != nil {
+			mailboxError(w, &domain.InvalidError{Code: "REQUEST_MALFORMED"})
+			return
+		}
+		value, err := classifier.Undo(r.Context(), principal(r).AccountID, r.PathValue("entry"), body.ActionID, body.Version)
+		mailboxResponse(w, value, err, http.StatusOK)
+	}))
+}
+
 func RegisterSend(mux *http.ServeMux, runtime *platform.Runtime, identity *application.Identity, sender *application.Sender, sends domain.SendRepository) {
 	read := func(handler http.HandlerFunc) http.Handler { return authenticated(identity, false, handler) }
 	write := func(handler http.HandlerFunc) http.Handler { return authenticated(identity, true, handler) }

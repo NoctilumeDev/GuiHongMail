@@ -78,6 +78,7 @@ type MessageSummary struct {
 	Folder          Folder     `json:"folder"`
 	Read            bool       `json:"read"`
 	CategoryID      *string    `json:"categoryId"`
+	CategorySource  *string    `json:"categorySource"`
 	Version         int64      `json:"version"`
 	FromAddress     string     `json:"fromAddress"`
 	FromName        *string    `json:"fromName"`

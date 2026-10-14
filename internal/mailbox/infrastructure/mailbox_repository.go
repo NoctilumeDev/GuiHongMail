@@ -16,7 +16,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const summarySQL = `SELECT e.entry_id,e.content_id,e.folder,e.is_read,e.category_id,e.version_no,e.created_at,c.from_address,c.from_name,c.subject,c.text_body,c.sent_at,(SELECT COUNT(*) FROM message_attachments a WHERE a.content_id=e.content_id) FROM mailbox_entries e JOIN message_contents c ON c.content_id=e.content_id`
+const summarySQL = `SELECT e.entry_id,e.content_id,e.folder,e.is_read,e.category_id,e.category_source,e.version_no,e.created_at,c.from_address,c.from_name,c.subject,c.text_body,c.sent_at,(SELECT COUNT(*) FROM message_attachments a WHERE a.content_id=e.content_id) FROM mailbox_entries e JOIN message_contents c ON c.content_id=e.content_id`
 
 type MailboxRepository struct {
 	database *sql.DB
@@ -225,7 +225,13 @@ func (r *MailboxRepository) Change(ctx context.Context, accountID, entryID strin
 	}
 	descriptor := fmt.Sprintf("mailbox-change|%s|%s", accountID, entryID)
 	err := r.witness.Write(ctx, descriptor, func(tx *sql.Tx) error {
-		current, err := lockedVersion(ctx, tx, "mailbox_entries", "entry_id", entryID, accountID)
+		var current int64
+		var priorCategory, priorSource sql.NullString
+		var fromAddress, subject string
+		err := tx.QueryRowContext(ctx, `SELECT e.version_no,e.category_id,e.category_source,c.from_address,c.subject FROM mailbox_entries e JOIN message_contents c ON c.content_id=e.content_id WHERE e.entry_id=? AND e.account_id=? FOR UPDATE`, entryID, accountID).Scan(&current, &priorCategory, &priorSource, &fromAddress, &subject)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ErrNotFound
+		}
 		if err != nil {
 			return err
 		}
@@ -250,7 +256,28 @@ func (r *MailboxRepository) Change(ctx context.Context, accountID, entryID strin
 			folderSet = true
 			folder = *change.Folder
 		}
-		_, err = tx.ExecContext(ctx, "UPDATE mailbox_entries SET is_read=IF(?,?,is_read),folder=IF(?,?,folder),category_id=IF(?,?,category_id),version_no=version_no+1 WHERE entry_id=? AND account_id=?", readSet, read, folderSet, folder, change.CategorySet, change.CategoryID, entryID, accountID)
+		var actionID any
+		if change.CategorySet {
+			actionID = uuid.NewString()
+		}
+		_, err = tx.ExecContext(ctx, "UPDATE mailbox_entries SET is_read=IF(?,?,is_read),folder=IF(?,?,folder),category_id=IF(?,?,category_id),category_source=IF(?,'MANUAL_LOCKED',category_source),category_action_id=IF(?,?,category_action_id),classification_checked_at=IF(?,CURRENT_TIMESTAMP(6),classification_checked_at),version_no=version_no+1 WHERE entry_id=? AND account_id=?", readSet, read, folderSet, folder, change.CategorySet, change.CategoryID, change.CategorySet, change.CategorySet, actionID, change.CategorySet, entryID, accountID)
+		if err != nil || !change.CategorySet {
+			return err
+		}
+		priorCategoryValue, priorSourceValue := nullable(priorCategory), nullable(priorSource)
+		_, err = tx.ExecContext(ctx, `INSERT INTO classification_actions(action_id,account_id,entry_id,source_kind,prior_category_id,prior_source,applied_category_id,entry_version_before,entry_version_after) VALUES(?,?,?,'MANUAL_LOCKED',?,?,?,?,?)`, actionID, accountID, entryID, priorCategoryValue, priorSourceValue, change.CategoryID, current, current+1)
+		if err != nil {
+			return err
+		}
+		features, _ := json.Marshal(domain.ClassificationFeatures(fromAddress, subject))
+		decision := "CLEARED"
+		if change.CategoryID != nil {
+			decision = "CONFIRMED"
+		}
+		if _, err = tx.ExecContext(ctx, `INSERT INTO classification_feedback(feedback_id,account_id,entry_id,category_id,decision,features_json) VALUES(?,?,?,?,?,?)`, uuid.NewString(), accountID, entryID, change.CategoryID, decision, string(features)); err != nil {
+			return err
+		}
+		_, err = tx.ExecContext(ctx, "UPDATE classification_suggestions SET status_value='WITHDRAWN',decided_at=CURRENT_TIMESTAMP(6) WHERE account_id=? AND entry_id=? AND status_value='PENDING'", accountID, entryID)
 		return err
 	})
 	if err != nil {
@@ -514,7 +541,7 @@ func (r *MailboxRepository) DeleteCategory(ctx context.Context, accountID, id st
 		if current != expected {
 			return &domain.VersionConflictError{Current: current}
 		}
-		if _, err = tx.ExecContext(ctx, "UPDATE mailbox_entries SET category_id=NULL,version_no=version_no+1 WHERE account_id=? AND category_id=?", accountID, id); err != nil {
+		if _, err = tx.ExecContext(ctx, "UPDATE mailbox_entries SET category_id=NULL,category_source=NULL,category_action_id=NULL,classification_checked_at=NULL,version_no=version_no+1 WHERE account_id=? AND category_id=?", accountID, id); err != nil {
 			return err
 		}
 		_, err = tx.ExecContext(ctx, "DELETE FROM categories WHERE category_id=? AND account_id=?", id, accountID)
@@ -538,12 +565,15 @@ type rowScanner interface{ Scan(...any) error }
 
 func scanSummary(row rowScanner) (domain.MessageSummary, error) {
 	var v domain.MessageSummary
-	var category, from sql.NullString
+	var category, categorySource, from sql.NullString
 	var sent sql.NullTime
 	var text string
-	err := row.Scan(&v.EntryID, &v.ContentID, &v.Folder, &v.Read, &category, &v.Version, &v.ReceivedAt, &v.FromAddress, &from, &v.Subject, &text, &sent, &v.AttachmentCount)
+	err := row.Scan(&v.EntryID, &v.ContentID, &v.Folder, &v.Read, &category, &categorySource, &v.Version, &v.ReceivedAt, &v.FromAddress, &from, &v.Subject, &text, &sent, &v.AttachmentCount)
 	if category.Valid {
 		v.CategoryID = &category.String
+	}
+	if categorySource.Valid {
+		v.CategorySource = &categorySource.String
 	}
 	if from.Valid {
 		v.FromName = &from.String
@@ -557,6 +587,12 @@ func scanSummary(row rowScanner) (domain.MessageSummary, error) {
 		v.Preview = string([]rune(v.Preview)[:200])
 	}
 	return v, err
+}
+func nullable(value sql.NullString) any {
+	if value.Valid {
+		return value.String
+	}
+	return nil
 }
 func (r *MailboxRepository) attachments(ctx context.Context, query string, args ...any) ([]domain.Attachment, error) {
 	rows, err := r.database.QueryContext(ctx, query, args...)

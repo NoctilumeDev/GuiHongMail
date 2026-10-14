@@ -25,12 +25,23 @@ func main() {
 		mailboxhttp.RegisterMailbox(mux, runtime, identity, mailbox)
 		sender := application.NewSender(mailboxRepository, mailboxRepository, infrastructure.MIMEParser{}, runtime.Objects)
 		mailboxhttp.RegisterSend(mux, runtime, identity, sender, mailboxRepository)
+		classifier := application.NewClassifier(mailboxRepository, infrastructure.NewPythonClassifier(runtime.Config.ClassifierPython, runtime.Config.ClassifierScript))
+		mailboxhttp.RegisterClassification(mux, identity, classifier)
 		mailboxhttp.RegisterWeb(mux, "backend/mailbox-service/src/main/resources/static")
 	}, func(ctx context.Context, runtime *platform.Runtime) error {
 		mailboxRepository := infrastructure.NewMailboxRepository(runtime.Database, runtime.Witness, runtime.Writable)
 		sender := application.NewSender(mailboxRepository, mailboxRepository, infrastructure.MIMEParser{}, runtime.Objects)
 		importer := application.NewIngressImporter(mailboxRepository, infrastructure.MIMEParser{}, runtime.Objects)
-		return sender.Run(ctx, runtime, importer)
+		classifier := application.NewClassifier(mailboxRepository, infrastructure.NewPythonClassifier(runtime.Config.ClassifierPython, runtime.Config.ClassifierScript))
+		errorsChannel := make(chan error, 2)
+		go func() { errorsChannel <- sender.Run(ctx, runtime, importer) }()
+		go func() { errorsChannel <- classifier.Run(ctx) }()
+		select {
+		case <-ctx.Done():
+			return nil
+		case failure := <-errorsChannel:
+			return failure
+		}
 	})
 	if err != nil {
 		log.Fatal(err)
