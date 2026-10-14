@@ -2,7 +2,7 @@
 
 > 云水之间，归鸿有信。
 
-**状态：`M1G_GO_PREFLIGHT_PASS / GO_M1_IMPLEMENTATION_AUTHORIZED / JAVA_M1_BASELINE_QUALIFIED` · 2026-10-13。** Java M1 已在 main `51fe465` 经 PR/CI、fresh exact-main 三子门、资源窗口与公开 Core 聚合取得资格；该结论绑定旧 Java SHA。Go Remoting 客户端现已在无 Proxy 的 RocketMQ 5.5.0 拓扑完成持久发送、Broker 重启、显式 retry、幂等、资源窗口与精确清理，错哈希负控为 FAIL；这只授权 Go 版从 M1 重建，尚不授予 Go M1/M2 产品资格。见 [M1G 预检证据](docs/acceptance/m1g.md)、[M0.1 Go 追加授权](docs/m0.1-go-runtime.md)、[状态账册](docs/status.md)、[M1 Java 资格证据](docs/acceptance/m1.md)与[原授权](docs/authorization.md)。
+**状态：`M6_ENGINEERING_CANDIDATE / VISUAL_POLISH_PENDING / AWAITING_M7_HUMAN_REVIEW` · 2026-10-14。** Go 运行候选 main `ce1929a` 已完成两轮不同 fresh checkout 的独立构建、真实 SMTP/浏览器/恢复复验、公开 prerelease 资产读回、VeriTrail 12 项聚合与三类负控。M7 最终视觉精修、E1 公网互通和正式生产发布仍未授权。见 [M6 资格证据](docs/acceptance/m6-go.md)、[状态账册](docs/status.md)、[操作手册](docs/operator-guide.md)与[原授权](docs/authorization.md)。
 
 ## 产品定位
 
@@ -16,7 +16,7 @@
 
 ## 工程结构
 
-独立仓库为 `NoctilumeDev/GuiHongMail`，本地目录 `C:\Users\lenovo\Desktop\GitHubProjects\GuiHongMail`。三个有状态职责的服务：`mailbox-service`、`smtp-ingress`、`delivery-worker`，每个服务独立数据所有权与失败生命周期；Go 是新后端运行时，Vue 3 + TypeScript 是 Web 客户端，Python 只在 M4 真正需要算法时经可替换合同接入。MySQL8、RocketMQ、SeaweedFS 本地 S3 仍是当前项目隔离依赖，**不预设 Redis/Nacos/独立 Gateway**；RocketMQ Go Remoting 路径已通过有限 M1G，Go 三服务仍须从 M1 重新取得完整资格。
+独立仓库为 `NoctilumeDev/GuiHongMail`，本地目录 `C:\Users\lenovo\Desktop\GitHubProjects\GuiHongMail`。三个有状态职责的服务：`mailbox-service`、`smtp-ingress`、`delivery-worker`，每个服务独立数据所有权与失败生命周期；Go 是后端运行时，Vue 3 + TypeScript 是 Web 客户端，Python 只在 M4 真正需要算法时经可替换合同接入。MySQL8、RocketMQ、SeaweedFS 本地 S3 是当前项目隔离依赖，**不预设 Redis/Nacos/独立 Gateway**；Go 三服务已按 M1–M6 分阶段取得资格。
 
 ## 连续施工与截止点
 
@@ -29,6 +29,7 @@
 3. [一次授权连续运行合同](docs/continuous-run.md)
 4. [工程候选操作手册](docs/operator-guide.md)
 5. [M6 工程候选退出计划](docs/m6-plan.md)
+6. [M6 工程候选资格证据](docs/acceptance/m6-go.md)
 4. [架构/服务所有权](docs/contracts/service-boundaries.md)
 5. [邮件与分类事实](docs/contracts/mail-facts.md)
 6. [安全合同](docs/contracts/security.md)
