@@ -144,6 +144,17 @@ class M5ChildSummaryTest(unittest.TestCase):
                     veritrail_m5.load_child('artifacts/local/run/evidence.json', 'source')
 
 
+class ObjectCollectorTest(unittest.TestCase):
+    def test_gc_failure_witness_is_created_after_the_protection_probe(self):
+        collector = (lab.ROOT / 'scripts/veritrail_objects.py').read_text(encoding='utf-8')
+        protection = collector.index("protected_gc=call('mailbox','/internal/storage/gc','POST')")
+        dedicated = collector.index("stage('mailbox','gc_failure'", protection)
+        failure = collector.index("gc_failure=call('mailbox','/internal/storage/gc','POST')", dedicated)
+        self.assertLess(protection, dedicated)
+        self.assertLess(dedicated, failure)
+        self.assertIn("hard('gc-bounded','gc/deleted_count',6)", collector)
+
+
 @unittest.skipUnless(os.name=='nt','Windows TCP ownership gate')
 class ConnectedPeerTest(unittest.TestCase):
     def test_unowned_connected_listener_receives_no_http_or_bearer_bytes(self):
