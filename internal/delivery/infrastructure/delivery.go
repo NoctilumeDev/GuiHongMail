@@ -144,9 +144,6 @@ func acceptEvent(ctx context.Context, runtime *platform.Runtime, key string, bod
 }
 
 func quarantineEvent(ctx context.Context, runtime *platform.Runtime, key string, body []byte, reason string) error {
-	if len(body) > 5*1024*1024 {
-		body = body[:5*1024*1024]
-	}
 	payloadDigest := platform.SHA256(body)
 	keyDigest := platform.SHA256([]byte(key))
 	return runtime.Witness.Write(ctx, "delivery-quarantine|"+payloadDigest+"|"+reason, func(tx *sql.Tx) error {
@@ -453,6 +450,10 @@ func reconcileScope(ctx context.Context, tx *sql.Tx, scope string) error {
 
 func Register(mux *http.ServeMux, runtime *platform.Runtime) {
 	mux.Handle("GET /internal/dispatch-scopes/{scope}", internal(runtime, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !runtime.Writable(r.Context()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "NOT_RECONCILED"})
+			return
+		}
 		value, err := scopeStatus(r.Context(), runtime.Database, r.PathValue("scope"))
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "not found", http.StatusNotFound)
@@ -465,6 +466,10 @@ func Register(mux *http.ServeMux, runtime *platform.Runtime) {
 		writeJSON(w, http.StatusOK, value)
 	})))
 	mux.Handle("POST /internal/dispatch-scopes/{scope}/cancel", internal(runtime, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !runtime.Writable(r.Context()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "NOT_RECONCILED"})
+			return
+		}
 		input, err := decodeDecision(r)
 		if err == nil {
 			err = cancelScope(r.Context(), runtime, r.PathValue("scope"), input)
@@ -481,6 +486,10 @@ func Register(mux *http.ServeMux, runtime *platform.Runtime) {
 		writeJSON(w, http.StatusOK, value)
 	})))
 	mux.Handle("POST /internal/dispatch-scopes/{scope}/retry-unknown", internal(runtime, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !runtime.Writable(r.Context()) {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"code": "NOT_RECONCILED"})
+			return
+		}
 		input, err := decodeDecision(r)
 		if err == nil && (!input.ConfirmDuplicateRisk || !retryKey.MatchString(input.RequestKey)) {
 			err = errBadDecision
