@@ -23,6 +23,20 @@ class ContainerBudgetTest(unittest.TestCase):
         self.assertIn('10%', contract)
         self.assertIn('16 PID', contract)
 
+    def test_m6_exit_plan_and_operator_guide_keep_runtime_and_visual_boundaries(self):
+        plan = (lab.ROOT / 'docs/m6-plan.md').read_text(encoding='utf-8')
+        guide = (lab.ROOT / 'docs/operator-guide.md').read_text(encoding='utf-8')
+        for number in range(1, 13):
+            self.assertIn(f'M6-{number:02d}', plan)
+        self.assertIn('错误 release', plan)
+        self.assertIn('VISUAL_POLISH_PENDING', plan)
+        self.assertIn('AWAITING_M7_HUMAN_REVIEW', plan)
+        self.assertIn('scripts\\lab.py init', guide)
+        self.assertIn('scripts\\go_apps.py start', guide)
+        self.assertIn('scripts\\go_apps.py stop', guide)
+        self.assertIn('scripts\\lab.py down', guide)
+        self.assertIn('禁止 `docker system prune`', guide)
+
     def test_docker_memory_units_are_converted_without_treating_host_total_as_container_use(self):
         self.assertEqual(313 * 1024**2 + int(.9 * 1024**2), resource_guard.parse_size('313.9MiB'))
         self.assertEqual(153300000, resource_guard.parse_size('153.3MB'))

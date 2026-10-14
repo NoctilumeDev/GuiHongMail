@@ -12,7 +12,7 @@
 | M3 | Go `QUALIFIED`，运行资格 main `3cce7d162a1a5889fc69db7c4a42087b21682a09`；PR/CI、fresh exact-main 18 项 SMTP/投递门、真实 Edge、资源窗口、两类负控和 owned 清理闭合；见 [Go M3 资格](acceptance/m3-go.md)、[M3 计划](m3-plan.md)与[线缆修订 1.1](m3-plan-1.1.md) |
 | M4 | Go `QUALIFIED`，运行资格 main `fba2e1469e589928ec54647b4b65dbd4c94db9f5`；PR/CI、fresh exact-main 16 项分类与产品回归门、真实 Edge、资源窗口、两类负控和 owned 清理闭合；见 [Go M4 资格](acceptance/m4-go.md)与[M4 计划](m4-plan.md) |
 | M5 | Go `QUALIFIED`，运行资格 main `b77cd819f94c7319dc74bf130e99f8ee63b9ee4d`；资源合同 1.3 的 PR/CI、main CI、fresh exact-main 五子门、18 项聚合、两类负控和 owned 清理闭合。资源合同 1.2 的本地候选与首败保留原绑定。见 [Go M5 资格](acceptance/m5-go.md)、[M5 计划](m5-plan.md)与[资源合同 1.3](m1-resource-contract-1.3.md) |
-| M6 | `AUTHORIZED / NEXT`，按连续施工授权进入工程验收，尚未取得资格 |
+| M6 | `IMPLEMENTATION_IN_PROGRESS / NOT_QUALIFIED`，已在首次运行观察前封存 [M6 退出计划](m6-plan.md)，补齐[工程候选操作手册](operator-guide.md)与两轮独立收束器；仍待 PR/CI、固定 main、两轮 fresh checkout、产品复核、prerelease、Core 负控与公开读回 |
 | M7 | `DEFERRED_HUMAN_PARTICIPATION`，需用户另行开启 |
 | E1 | `NOT_AUTHORIZED` |
 | 运行时 | 当前主线为 Go `1.27.2` 三服务，`rocketmq-client-go/v2@v2.1.2` 对接无 Proxy 的 RocketMQ 5.5.0；Go M1–M5 已分别取得 exact-main 资格，当前施工边界为 M6 |
