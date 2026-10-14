@@ -19,6 +19,16 @@ Edge `155.0.4283.45` 实际完成桌面规则优先级修改、搜索、建议�
 - `guihong-m4-a2d5f8041a234a92b1f099721b8dca94` 在 source `567b0b72994b14606441d3cbe1bcd125e3596f50` 为 `ERROR / PENDING`：规则刷新已按合同撤回旧建议，采集器却随后决策旧 ID。原结果保留；采集顺序改为先完成建议决策，再验证规则刷新。
 - `guihong-m4-0dbf134448ba4903a7d4d7d48da5e0da` 在 source `3ef89155b94f26b79e1715e42d60fadf43e23203` 得到真实 `COMPLETED / FAIL`：16 项中 14 项通过。发送与回复产生的最终异步分类尚未收敛就取了重启前快照；导航按钮的可访问名称被未读徽标扩展。稳态重复重启已证明分类表相等，下一候选要求待分类数先归零并按实际导航元素判断可见性，没有降低重启或产品回归断言。
 
-## 当前边界
+## exact-main
 
-本 PASS 只证明精确本地候选源码。M4 尚未经过 PR、CI、受保护合入和 fresh exact-main 复验，因此当前为 `LOCAL_CANDIDATE_PASS / NOT_QUALIFIED`，不能据此启动 M5。
+[PR #12](https://github.com/NoctilumeDev/GuiHongMail/pull/12) 的静态合同、Go 后端与 Web 三项检查通过后，于 `2026-10-14T04:48:36Z` 受保护合入 merge SHA `fba2e1469e589928ec54647b4b65dbd4c94db9f5`。PR CI `38513251711` 与该 SHA 的 main CI `38513314097` 均成功。
+
+fresh detached worktree 实际确认 `HEAD == origin/main == fba2e1469e589928ec54647b4b65dbd4c94db9f5` 且工作树干净。收集器与 Web 依赖分别从哈希锁和 `package-lock.json` 重新安装，三个 schema 在首次迁移前均为 virgin；三个 Go 二进制与前端从 exact-main 重建，构建回执 SHA-256 为 `4aebefb17d53ea9f7e56ecc1c37d6d9878362502316746c548823592126cbfb3`。
+
+fresh lab `guihong-local-1ddfa86aa127` 的运行 `guihong-m4-79b76dfa51eb43c3a7d0f9cb90c71dfe` 于 `2026-10-14T12:58:11.194606+08:00` 得到 `COMPLETED / PASS`，16 个硬用例全部通过。Plan 摘要 `5b71f89673f8424e623d9cc060adc92b193e2f661d9cd922f2b76d50f3447a93`，事实摘要 `4de0b11e351a2aee67fb42db9d266631ba75d0eeb3408abc55ca5e380aba469b`，请求摘要 `ac3aab83c5afebeefcc0ef8d24d48301199035e1df1cd72610dac520b9eee8a0`，bundle manifest SHA-256 `57059188ba1a3287a81c4f3c2604765a6e1ef65950afc146c20fc5790853cb3e`。
+
+资源守卫取得 13 个完整拓扑样本，停止原因为空。宿主峰值 `14,069,026,816 bytes`，低于 14 GiB 停止线；容器最小内存余量 `41.64%`，最小 PID 余量 54。真实 Edge 再次完成桌面与移动端操作，外部请求为空。错误绑定负控 `guihong-m4-97bec9b3530c4e7f9d8fd5bf1e80244d` 为 `COMPLETED / INCONCLUSIVE`，缺证据负控 `guihong-m4-6ae37b9703d541a5a4ba2164a2db1663` 为 `COMPLETED / PENDING`。应用已正常停止，owned 容器、网络和三个卷经标签核对后精确清理；private lab 与见证归档。
+
+## 资格结论
+
+Go M4 在 `fba2e1469e589928ec54647b4b65dbd4c94db9f5` 取得运行资格：本地候选、两轮 CI、受保护合入、fresh exact-main 重建、16 项分类/浏览器/产品回归门、资源窗口、负控及 owned 清理闭合。M4 状态为 `QUALIFIED`，下一阶段为 Go M5；本记录不提前证明 M5 故障矩阵或 M6 工程候选资格。

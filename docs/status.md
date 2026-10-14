@@ -10,10 +10,10 @@
 | M1 | Go `QUALIFIED`，运行资格 main `2a1dd5ae86ed01655cc723ae2d94176e8cdf4054`；PR/CI、fresh exact-main 三子门、资源聚合、三类负控和 owned 清理闭合。Java main `51fe46533cc45d7ef5d010db6803165de0780905` 的历史资格保留为对照；[Go M1 资格](acceptance/m1-go.md)、[Java M1 资格](acceptance/m1.md)、[M1G 证据](acceptance/m1g.md)、[资源合同修订 1.1](m1-resource-contract-1.1.md)、[运行账册](run-ledger.md) |
 | M2 | Go `QUALIFIED`，运行资格 main `4f92a5dfc646693237b476b4f38448d7bd798af6`；PR/CI、fresh exact-main 16 项运行门、真实 Edge、资源窗口、两类负控和 owned 清理闭合。Java 候选 `3136c6f` 只作迁移历史，不向 Go 提供资格；见 [Go M2 资格](acceptance/m2-go.md) |
 | M3 | Go `QUALIFIED`，运行资格 main `3cce7d162a1a5889fc69db7c4a42087b21682a09`；PR/CI、fresh exact-main 18 项 SMTP/投递门、真实 Edge、资源窗口、两类负控和 owned 清理闭合；见 [Go M3 资格](acceptance/m3-go.md)、[M3 计划](m3-plan.md)与[线缆修订 1.1](m3-plan-1.1.md) |
-| M4 | `LOCAL_CANDIDATE_PASS / NOT_QUALIFIED`；候选 `9e5cff04869590793792c0362f7f846b2ff56e01` 的 16 项运行门、真实 Edge、资源窗口与两类负控通过，尚待 PR/CI、受保护合入和 fresh exact-main；见 [Go M4 候选](acceptance/m4-go.md)与[M4 计划](m4-plan.md) |
-| M5–M6 | `AUTHORIZED / NOT_STARTED`，依前一阶段门禁连续串行推进 |
+| M4 | Go `QUALIFIED`，运行资格 main `fba2e1469e589928ec54647b4b65dbd4c94db9f5`；PR/CI、fresh exact-main 16 项分类与产品回归门、真实 Edge、资源窗口、两类负控和 owned 清理闭合；见 [Go M4 资格](acceptance/m4-go.md)与[M4 计划](m4-plan.md) |
+| M5–M6 | `AUTHORIZED / NOT_STARTED`，下一阶段为 Go M5，依门禁连续串行推进 |
 | M7 | `DEFERRED_HUMAN_PARTICIPATION`，需用户另行开启 |
 | E1 | `NOT_AUTHORIZED` |
-| 运行时 | 当前主线为 Go `1.27.2` 三服务，`rocketmq-client-go/v2@v2.1.2` 对接无 Proxy 的 RocketMQ 5.5.0；Go M1、M2、M3 已分别取得 exact-main 资格，M4 仅有本地候选 PASS，尚无 M4+ 产品资格 |
+| 运行时 | 当前主线为 Go `1.27.2` 三服务，`rocketmq-client-go/v2@v2.1.2` 对接无 Proxy 的 RocketMQ 5.5.0；Go M1、M2、M3、M4 已分别取得 exact-main 资格，尚无 M5+ 产品资格 |
 
-M0 状态发布已在 `da2ab376c1c84b0b487e3c33b5baafece320b105` 经原 PR 门、受保护合入、新 exact-main 文档门和具名公开读回闭合。Go M1、M2、M3 资格分别绑定 `2a1dd5ae86ed01655cc723ae2d94176e8cdf4054`、`4f92a5dfc646693237b476b4f38448d7bd798af6`、`3cce7d162a1a5889fc69db7c4a42087b21682a09` 的独立 exact-main 运行证据，不由状态文字或 Java 基线推导。当前只推进 M4 的保护合入与 exact-main 资格闭合。
+M0 状态发布已在 `da2ab376c1c84b0b487e3c33b5baafece320b105` 经原 PR 门、受保护合入、新 exact-main 文档门和具名公开读回闭合。Go M1、M2、M3、M4 资格分别绑定 `2a1dd5ae86ed01655cc723ae2d94176e8cdf4054`、`4f92a5dfc646693237b476b4f38448d7bd798af6`、`3cce7d162a1a5889fc69db7c4a42087b21682a09`、`fba2e1469e589928ec54647b4b65dbd4c94db9f5` 的独立 exact-main 运行证据，不由状态文字或 Java 基线推导。下一阶段为 Go M5。
