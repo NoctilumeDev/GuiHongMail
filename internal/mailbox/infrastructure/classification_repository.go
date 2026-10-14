@@ -241,7 +241,7 @@ func (r *MailboxRepository) StoreModel(ctx context.Context, accountID string, va
 	if err != nil {
 		return err
 	}
-	_, err = r.database.ExecContext(ctx, `INSERT INTO classification_models(account_id,model_version,sample_digest,sample_count,category_counts,model_json) VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE model_version=VALUES(model_version),sample_digest=VALUES(sample_digest),sample_count=VALUES(sample_count),category_counts=VALUES(category_counts),model_json=VALUES(model_json),created_at=CURRENT_TIMESTAMP(6)`, accountID, value.ModelVersion, value.SampleDigest, value.SampleCount, counts, model)
+	_, err = r.database.ExecContext(ctx, `INSERT INTO classification_models(account_id,model_version,sample_digest,sample_count,category_counts,model_json) VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE model_version=VALUES(model_version),sample_digest=VALUES(sample_digest),sample_count=VALUES(sample_count),category_counts=VALUES(category_counts),model_json=VALUES(model_json),created_at=CURRENT_TIMESTAMP(6)`, accountID, value.ModelVersion, value.SampleDigest, value.SampleCount, string(counts), string(model))
 	return err
 }
 
@@ -265,7 +265,7 @@ func (r *MailboxRepository) SaveSuggestion(ctx context.Context, accountID string
 		if _, err = tx.ExecContext(ctx, "UPDATE classification_suggestions SET status_value='WITHDRAWN',decided_at=CURRENT_TIMESTAMP(6) WHERE account_id=? AND entry_id=? AND status_value='PENDING'", accountID, input.EntryID); err != nil {
 			return err
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO classification_suggestions(suggestion_id,account_id,entry_id,category_id,source_kind,status_value,confidence,margin_value,reason_text,evidence_json,rule_id,rule_version,model_version,entry_version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, accountID, input.EntryID, value.CategoryID, value.Source, value.Status, value.Confidence, value.Margin, value.Reason, evidence, value.RuleID, value.RuleVersion, value.ModelVersion, input.Version)
+		_, err = tx.ExecContext(ctx, `INSERT INTO classification_suggestions(suggestion_id,account_id,entry_id,category_id,source_kind,status_value,confidence,margin_value,reason_text,evidence_json,rule_id,rule_version,model_version,entry_version) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, value.ID, accountID, input.EntryID, value.CategoryID, value.Source, value.Status, value.Confidence, value.Margin, value.Reason, string(evidence), value.RuleID, value.RuleVersion, value.ModelVersion, input.Version)
 		return err
 	})
 	if err != nil {
@@ -325,7 +325,7 @@ func (r *MailboxRepository) ApplySuggestion(ctx context.Context, accountID, entr
 				return err
 			}
 			features, _ := json.Marshal(domain.ClassificationFeatures(fromAddress, subject))
-			if _, err = tx.ExecContext(ctx, `INSERT INTO classification_feedback(feedback_id,account_id,entry_id,category_id,decision,features_json,suggestion_id) VALUES(?,?,?,?,'CONFIRMED',?,?)`, uuid.NewString(), accountID, entryID, category.String, features, suggestionID); err != nil {
+			if _, err = tx.ExecContext(ctx, `INSERT INTO classification_feedback(feedback_id,account_id,entry_id,category_id,decision,features_json,suggestion_id) VALUES(?,?,?,?,'CONFIRMED',?,?)`, uuid.NewString(), accountID, entryID, category.String, string(features), suggestionID); err != nil {
 				return err
 			}
 		}
@@ -359,7 +359,7 @@ func (r *MailboxRepository) RejectSuggestion(ctx context.Context, accountID, ent
 		if _, err := tx.ExecContext(ctx, "UPDATE classification_suggestions SET status_value='REJECTED',decided_at=CURRENT_TIMESTAMP(6) WHERE suggestion_id=?", suggestionID); err != nil {
 			return err
 		}
-		_, err := tx.ExecContext(ctx, `INSERT INTO classification_feedback(feedback_id,account_id,entry_id,category_id,decision,features_json,suggestion_id) VALUES(?,?,?,?,'REJECTED',?,?)`, uuid.NewString(), accountID, entryID, nullable(category), features, suggestionID)
+		_, err := tx.ExecContext(ctx, `INSERT INTO classification_feedback(feedback_id,account_id,entry_id,category_id,decision,features_json,suggestion_id) VALUES(?,?,?,?,'REJECTED',?,?)`, uuid.NewString(), accountID, entryID, nullable(category), string(features), suggestionID)
 		return err
 	})
 	if err != nil {
