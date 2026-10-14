@@ -27,6 +27,8 @@
 1. [M0 决策总纲](docs/m0.md)
 2. [阶段门与退出标准](docs/milestones.md)
 3. [一次授权连续运行合同](docs/continuous-run.md)
+4. [工程候选操作手册](docs/operator-guide.md)
+5. [M6 工程候选退出计划](docs/m6-plan.md)
 4. [架构/服务所有权](docs/contracts/service-boundaries.md)
 5. [邮件与分类事实](docs/contracts/mail-facts.md)
 6. [安全合同](docs/contracts/security.md)
