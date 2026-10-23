@@ -6,6 +6,7 @@ import re
 import subprocess
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+from check_credentials import scan as scan_credentials
 
 ROOT = Path(__file__).resolve().parents[1]
 SEAL = ROOT / 'docs/m0-seal.json'
@@ -221,16 +222,8 @@ def architecture():
 
 def security():
     errors=[]
-    tracked=subprocess.check_output(['git','ls-files','-z'],cwd=ROOT).decode().split('\0')
-    signatures=[b'-----BEGIN '+b'PRIVATE KEY-----',b'AKIA'+b'[A-Z0-9]{16}',b'ghp_'+b'[A-Za-z0-9]{30,}',
-                b'github_pat_'+b'[A-Za-z0-9_]{40,}',b'xoxb-'+b'[A-Za-z0-9-]{20,}']
-    text_suffixes={'.md','.py','.go','.java','.sql','.xml','.yml','.yaml','.json','.properties','.conf','.txt'}
-    for rel in filter(None,tracked):
-        path=ROOT/rel
-        if path.suffix.lower() not in text_suffixes or not path.is_file() or path.stat().st_size>2*1024*1024:continue
-        data=path.read_bytes()
-        for signature in signatures:
-            if re.search(signature,data):errors.append(rel+' contains a credential signature')
+    if scan_credentials(ROOT):
+        errors.append('tracked credential signatures detected; values withheld')
     compose=(ROOT/'deploy/compose.yaml').read_text(encoding='utf-8')
     published=re.findall(r"['\"]([^'\"]*:\d+:\d+)['\"]",compose)
     non_loopback=[item for item in published if not item.startswith('127.0.0.1:')]

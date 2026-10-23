@@ -1,0 +1,73 @@
+{
+  "schema": "guihong-dependency-review/1",
+  "source_revision": "c6284cb0f393f70583f896e8047819a67de3ecc3",
+  "owner": "NoctilumeDev/GuiHongMail maintainers",
+  "risk_accepted": false,
+  "inputs": {
+    "go.mod": "d5280047394fa1581f85e722c8cb78ce2c71bda0d92409215eec03b46e991065",
+    "go.sum": "d61a98de372b8d7fec09005da787db9358c30b9f31235197cff187f135446877",
+    "frontend/web/package.json": "d6c36aa2831787fc346ad6d725b7f9464d0a301d6707b52c75860d341252306e",
+    "frontend/web/package-lock.json": "d8c763ef77815e5db6d824d3a6f111bfaf78e615b54b899b7bd941a53cd734c0"
+  },
+  "sources": {
+    "go-windows": {
+      "inventory_sha256": "0c94a07ad26945c33b57a20db7201167ce31212ce9a7f990cbf371956089824e",
+      "package_count": 24,
+      "findings": {
+        "stdlib@v1.27.2/GO-2026-6809": {
+          "sha256": "c07ecd41c7e8a46bbb3b11505875a11f779792afb9d2e34da806f657a4a4deaf",
+          "status": "UNRESOLVED",
+          "source": "https://pkg.go.dev/vuln/GO-2026-6809",
+          "evidence_level": "SYMBOL_TRACE",
+          "next_action": "单独的 Go 工具链维护待办：核对受损中间证书、系统信任库与实际 TLS 条件；本次静态符号链可达，实际部署暴露未验证。任何 HTTPS/公网支持前优先处置，升级须另行授权。"
+        },
+        "golang.org/x/crypto@v0.58.0/GO-2026-5932": {
+          "sha256": "871e76fa9512da08d7c9c3f197c4da83be1ce14be11b37b63255f6b26960b3da",
+          "status": "UNRESOLVED",
+          "source": "https://pkg.go.dev/vuln/GO-2026-5932",
+          "evidence_level": "MODULE_VERSION",
+          "next_action": "后续依赖复核：记录模块命中；本次未观察到受影响 OpenPGP 包导入，不能据此宣称所有配置均不适用。导入或依赖范围变化时重新判定。"
+        },
+        "github.com/sirupsen/logrus@v1.4.0/GO-2025-4188": {
+          "sha256": "05104050ba2c840b19b5e62fd1cd457c815a08fe0326d461bdbe6625c2ce22ec",
+          "status": "UNRESOLVED",
+          "source": "https://pkg.go.dev/vuln/GO-2025-4188",
+          "evidence_level": "PACKAGE_IMPORTED",
+          "next_action": "第二轮 RocketMQ 传递依赖专项：核对 Logrus Writer 路径及升级兼容性；本轮仅保留候选，不以未观察到符号链排除风险。"
+        }
+      }
+    },
+    "go-linux": {
+      "inventory_sha256": "d52dd86b31c863559e290866728de1c2661c3f4adcdeb87f5fa77830d055c6f4",
+      "package_count": 25,
+      "findings": {
+        "github.com/sirupsen/logrus@v1.4.0/GO-2025-4188": {
+          "sha256": "05104050ba2c840b19b5e62fd1cd457c815a08fe0326d461bdbe6625c2ce22ec",
+          "status": "UNRESOLVED",
+          "source": "https://pkg.go.dev/vuln/GO-2025-4188",
+          "evidence_level": "PACKAGE_IMPORTED",
+          "next_action": "第二轮 RocketMQ 传递依赖专项：核对 Logrus Writer 路径及升级兼容性；本轮仅保留候选，不以未观察到符号链排除风险。"
+        },
+        "golang.org/x/crypto@v0.58.0/GO-2026-5932": {
+          "sha256": "871e76fa9512da08d7c9c3f197c4da83be1ce14be11b37b63255f6b26960b3da",
+          "status": "UNRESOLVED",
+          "source": "https://pkg.go.dev/vuln/GO-2026-5932",
+          "evidence_level": "MODULE_VERSION",
+          "next_action": "后续依赖复核：记录模块命中；本次未观察到受影响 OpenPGP 包导入，不能据此宣称所有配置均不适用。导入或依赖范围变化时重新判定。"
+        },
+        "stdlib@v1.27.2/GO-2026-6809": {
+          "sha256": "c07ecd41c7e8a46bbb3b11505875a11f779792afb9d2e34da806f657a4a4deaf",
+          "status": "UNRESOLVED",
+          "source": "https://pkg.go.dev/vuln/GO-2026-6809",
+          "evidence_level": "SYMBOL_TRACE",
+          "next_action": "单独的 Go 工具链维护待办：核对受损中间证书、系统信任库与实际 TLS 条件；本次静态符号链可达，实际部署暴露未验证。任何 HTTPS/公网支持前优先处置，升级须另行授权。"
+        }
+      }
+    },
+    "npm-web": {
+      "inventory_sha256": "d8c763ef77815e5db6d824d3a6f111bfaf78e615b54b899b7bd941a53cd734c0",
+      "package_count": 129,
+      "findings": {}
+    }
+  }
+}

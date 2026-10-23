@@ -5,6 +5,7 @@
 1. 从当前 main 建独立分支，写清基线 SHA、范围、保护的行为、不做什么、验收和停止条件。
 2. `python -B scripts/check.py all` 只做静态/结构门禁。实际后端另跑 CI 中的 Python 测试、`go test ./...`、`go vet ./...`、`go build ./cmd/...`；前端在 `frontend/web` 按锁文件 `npm ci --ignore-scripts` 后运行 `npm test` 和 `npm run build`。工具链与隔离要求按项目原运行说明。
 3. 本批保护负控入口为 `python -B -m unittest discover -s scripts/tests`，同时以 `-O` 复验。远端保护由有管理权限的维护者执行 `python -B scripts/check-branch-protection.py` 读回，普通 CI 不需要管理员密钥。
+   依赖变更检查另跑 `python -B scripts/dependency_gate.py`；输入、公告或扫描范围变化必须复核，不能自动刷新账册掩盖风险。范围、许可来源与覆盖盲区见 [Go/npm 护栏](docs/governance-quality.md)。
 4. PR 留命令、环境、实际结果、首次失败和剩余边界。走三项必需检查与受保护合并，不用管理员绕过；合并前后分别核对候选与新 main。CI 成功不等于 SMTP 已投递、真人已读或生产部署安全。
 
 三服务的事实所有权、UNKNOWN、幂等、恢复、邮件/附件隐私和人工分类优先不能被“治理整理”顺手改掉。不得改原封存合同、Plan、Bundle或删除首败来制造成功。新问题有自己的来源、所有者、处置状态；不能为了本轮收口抹去风险。
