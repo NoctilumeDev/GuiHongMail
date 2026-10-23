@@ -3,6 +3,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 4 * * 1'
 permissions:
   contents: read
 concurrency:
@@ -36,13 +39,16 @@ jobs:
   backend:
     name: Go backend
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
           cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.14.0'
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.10'
@@ -55,9 +61,17 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          go test -json ./... | tee artifacts/local/ci/go-test.jsonl
+          go test -json -coverpkg=./... -covermode=atomic -coverprofile=artifacts/local/ci/go-coverage.out ./... | tee artifacts/local/ci/go-test.jsonl
+      - name: Retain measured coverage, without a percentage threshold
+        shell: bash
+        run: |
+          set -o pipefail
+          test "$(wc -l < artifacts/local/ci/go-coverage.out)" -gt 1
+          go tool cover -func=artifacts/local/ci/go-coverage.out | tee artifacts/local/ci/go-coverage-functions.txt
       - run: go vet ./...
       - run: go build -trimpath -ldflags "-X github.com/NoctilumeDev/GuiHongMail/internal/platform.BuildSource=${{ github.sha }}" ./cmd/...
+      - name: Current Go and npm dependency advisory change gate
+        run: python -B scripts/dependency_gate.py
       - name: Retain Go check evidence on success or failure
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4
@@ -66,6 +80,10 @@ jobs:
           path: |
             artifacts/local/ci/checkout.json
             artifacts/local/ci/go-test.jsonl
+            artifacts/local/ci/go-coverage.out
+            artifacts/local/ci/go-coverage-functions.txt
+            artifacts/local/governance/dependencies/**
+            !artifacts/local/governance/dependencies/**/tools/**
           retention-days: 30
           if-no-files-found: warn
   frontend:
