@@ -9,7 +9,8 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 SEAL = ROOT / 'docs/m0-seal.json'
-REQUIRED = ['README.md', 'AGENTS.md', 'SECURITY.md', 'docs/m0.md', 'docs/milestones.md',
+REQUIRED = ['README.md', 'AGENTS.md', 'SECURITY.md', 'CONTRIBUTING.md',
+            'docs/governance-maintenance.md', 'docs/m0.md', 'docs/milestones.md',
             'docs/continuous-run.md', 'docs/authorization.md', 'docs/acceptance-obligations.md',
             'docs/contracts/mail-facts.md', 'docs/contracts/security.md',
             'docs/contracts/service-boundaries.md', 'docs/contracts/delivery-lifecycle.md',
