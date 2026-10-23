@@ -1,0 +1,21 @@
+{
+  "required_status_checks": {
+    "strict": true,
+    "checks": [
+      {"context": "Static contracts and boundaries", "app_id": 15368},
+      {"context": "Go backend", "app_id": 15368},
+      {"context": "Web typecheck, tests and production build", "app_id": 15368}
+    ]
+  },
+  "enforce_admins": true,
+  "required_pull_request_reviews": {
+    "dismiss_stale_reviews": true,
+    "require_code_owner_reviews": false,
+    "require_last_push_approval": false,
+    "required_approving_review_count": 0
+  },
+  "required_linear_history": false,
+  "allow_force_pushes": false,
+  "allow_deletions": false,
+  "required_conversation_resolution": true
+}
