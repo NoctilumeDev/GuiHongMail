@@ -2,6 +2,8 @@
 
 > 云水之间，归鸿有信。
 
+许可证：[Apache-2.0](LICENSE)。版权与第三方声明见 [NOTICE](NOTICE)；第三方依赖与素材保留各自许可。
+
 **状态：`M6_ENGINEERING_CANDIDATE / VISUAL_POLISH_PENDING / AWAITING_M7_HUMAN_REVIEW` · 2026-10-14。** Go 运行候选 main `ce1929a` 已完成两轮不同 fresh checkout 的独立构建、真实 SMTP/浏览器/恢复复验、公开 prerelease 资产读回、VeriTrail 12 项聚合与三类负控。M7 最终视觉精修、E1 公网互通和正式生产发布仍未授权。见 [M6 资格证据](docs/acceptance/m6-go.md)、[状态账册](docs/status.md)、[操作手册](docs/operator-guide.md)与[原授权](docs/authorization.md)。
 
 ## 产品定位
