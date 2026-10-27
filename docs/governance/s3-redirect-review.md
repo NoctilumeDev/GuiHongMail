@@ -36,7 +36,9 @@ Go JSON 另外包含父测试汇总；原输出的 22 个 fail 事件不代表 2
 
 原源码失败、新源码通过、测试源码及执行输出保存在本批独立证据包。重新验证负控时，使用独立基线检出，仅放入相同测试文件；不能把编译、下载或超时失败当作预期拒绝断言失败。
 
-## 独立阻塞与结论边界
+## 原候选的独立阻塞与结论边界
+
+以下保留 `4a1748159934060f9f12c5e7bb4728a4a543ece6` 候选当时的阻塞和范围。后续经授权独立处理依赖阻塞，见 [2026-10-27 依赖维护](dependency-maintenance-20261027.md)；不回写原始失败或继承为安全结论。
 
 [主线定期 CI 40305495179](https://github.com/NoctilumeDev/GuiHongMail/actions/runs/40305495179) 的 Go backend 已在本候选之前失败：Go 测试、vet、构建完成后，依赖门禁报告 `npm-web: findings changed; review required`。保存的 artifact `12643040322` SHA-256 为 `38ce4e1545b576c1f4020bae07dbc4fc40485ef3ec19f6e46b13d4eaa4cb58e2`。
 
