@@ -36,3 +36,9 @@ python -B scripts/check.py all
 ```
 
 Go 分类集成测试需要 Python 3；默认寻找 `python3` / `python`，也可用 `GUIHONG_TEST_PYTHON` 指定解释器。现有 Go CI 已配置 Python。当前结果仅是本地候选的修复证据，合并后的主线资格需另行读回。
+
+## CI 扫描范围读回
+
+首次 PR CI（run `40486460299`）的 Go 测试、vet 和构建通过，但依赖门禁拒绝扫描范围变化。新集成测试使用外部测试包 `internal/mailbox/application_test`，因而新增一个扫描根。分别重建 Windows、Linux 的清单摘要后，移除此新增扫描根即可精确还原原基线摘要；模块版本、许可源文件、依赖输入、六条平台公告记录及其内容均未变化。
+
+当前基于 `6ae84a692c3ad23cc17cde4f9caaf1cd3658adc5` 审查并更新两个范围摘要，保留全部既有风险状态；没有删除新测试根、跳过扫描或接受未解决风险。首败保留在上述 CI 运行及其后端证据资产中。

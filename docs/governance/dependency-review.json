@@ -1,6 +1,6 @@
 {
   "schema": "guihong-dependency-review/1",
-  "source_revision": "4a1748159934060f9f12c5e7bb4728a4a543ece6",
+  "source_revision": "6ae84a692c3ad23cc17cde4f9caaf1cd3658adc5",
   "owner": "NoctilumeDev/GuiHongMail maintainers",
   "risk_accepted": false,
   "inputs": {
@@ -11,7 +11,7 @@
   },
   "sources": {
     "go-windows": {
-      "inventory_sha256": "0c94a07ad26945c33b57a20db7201167ce31212ce9a7f990cbf371956089824e",
+      "inventory_sha256": "f7bf617263e62c29b2921552ceb68eed7bc289956ba04b4bfaa9c73addd011bf",
       "package_count": 24,
       "findings": {
         "stdlib@v1.27.2/GO-2026-6809": {
@@ -38,7 +38,7 @@
       }
     },
     "go-linux": {
-      "inventory_sha256": "d52dd86b31c863559e290866728de1c2661c3f4adcdeb87f5fa77830d055c6f4",
+      "inventory_sha256": "a4b7f3fe9e20cc759a97e7546ded28fc54aebccaa261401aea376ae02585d4db",
       "package_count": 25,
       "findings": {
         "github.com/sirupsen/logrus@v1.4.0/GO-2025-4188": {
