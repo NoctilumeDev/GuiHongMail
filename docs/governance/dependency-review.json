@@ -1,13 +1,13 @@
 {
   "schema": "guihong-dependency-review/1",
-  "source_revision": "c6284cb0f393f70583f896e8047819a67de3ecc3",
+  "source_revision": "4a1748159934060f9f12c5e7bb4728a4a543ece6",
   "owner": "NoctilumeDev/GuiHongMail maintainers",
   "risk_accepted": false,
   "inputs": {
     "go.mod": "d5280047394fa1581f85e722c8cb78ce2c71bda0d92409215eec03b46e991065",
     "go.sum": "d61a98de372b8d7fec09005da787db9358c30b9f31235197cff187f135446877",
     "frontend/web/package.json": "d6c36aa2831787fc346ad6d725b7f9464d0a301d6707b52c75860d341252306e",
-    "frontend/web/package-lock.json": "d8c763ef77815e5db6d824d3a6f111bfaf78e615b54b899b7bd941a53cd734c0"
+    "frontend/web/package-lock.json": "326f78488c1ea65b296122d62c7044c8a192b06a8b835d0aaf32a43738721043"
   },
   "sources": {
     "go-windows": {
@@ -15,7 +15,7 @@
       "package_count": 24,
       "findings": {
         "stdlib@v1.27.2/GO-2026-6809": {
-          "sha256": "c07ecd41c7e8a46bbb3b11505875a11f779792afb9d2e34da806f657a4a4deaf",
+          "sha256": "a8f0c5de3567905f8c265167b5c971ab480c950f501eb5ebd8d21086fe2790c7",
           "status": "UNRESOLVED",
           "source": "https://pkg.go.dev/vuln/GO-2026-6809",
           "evidence_level": "SYMBOL_TRACE",
@@ -56,7 +56,7 @@
           "next_action": "后续依赖复核：记录模块命中；本次未观察到受影响 OpenPGP 包导入，不能据此宣称所有配置均不适用。导入或依赖范围变化时重新判定。"
         },
         "stdlib@v1.27.2/GO-2026-6809": {
-          "sha256": "c07ecd41c7e8a46bbb3b11505875a11f779792afb9d2e34da806f657a4a4deaf",
+          "sha256": "a8f0c5de3567905f8c265167b5c971ab480c950f501eb5ebd8d21086fe2790c7",
           "status": "UNRESOLVED",
           "source": "https://pkg.go.dev/vuln/GO-2026-6809",
           "evidence_level": "SYMBOL_TRACE",
@@ -65,7 +65,7 @@
       }
     },
     "npm-web": {
-      "inventory_sha256": "d8c763ef77815e5db6d824d3a6f111bfaf78e615b54b899b7bd941a53cd734c0",
+      "inventory_sha256": "326f78488c1ea65b296122d62c7044c8a192b06a8b835d0aaf32a43738721043",
       "package_count": 129,
       "findings": {}
     }

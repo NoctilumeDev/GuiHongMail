@@ -56,8 +56,16 @@ func NewS3Client(endpoint, bucket, key, secret string) (*S3Client, error) {
 	}
 	return &S3Client{
 		endpoint: parsed, bucket: bucket, key: key, secret: secret,
-		client: &http.Client{Timeout: 10 * time.Second, Transport: transport},
-		now:    time.Now,
+		client: &http.Client{
+			Timeout:   10 * time.Second,
+			Transport: transport,
+			// The signed request is bound to this endpoint and object. Return
+			// the original 3xx response; do not silently send a second request.
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
+		now: time.Now,
 	}, nil
 }
 

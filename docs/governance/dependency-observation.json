@@ -3,7 +3,7 @@
     "go.mod": "d5280047394fa1581f85e722c8cb78ce2c71bda0d92409215eec03b46e991065",
     "go.sum": "d61a98de372b8d7fec09005da787db9358c30b9f31235197cff187f135446877",
     "frontend/web/package.json": "d6c36aa2831787fc346ad6d725b7f9464d0a301d6707b52c75860d341252306e",
-    "frontend/web/package-lock.json": "d8c763ef77815e5db6d824d3a6f111bfaf78e615b54b899b7bd941a53cd734c0"
+    "frontend/web/package-lock.json": "326f78488c1ea65b296122d62c7044c8a192b06a8b835d0aaf32a43738721043"
   },
   "sources": {
     "go-windows": {
@@ -137,8 +137,8 @@
                   "receiver": "*S3Client",
                   "position": {
                     "filename": "internal/platform/s3.go",
-                    "offset": 3465,
-                    "line": 123,
+                    "offset": 3725,
+                    "line": 131,
                     "column": 16
                   }
                 }
@@ -774,8 +774,8 @@
                   "receiver": "*S3Client",
                   "position": {
                     "filename": "internal/platform/s3.go",
-                    "offset": 3465,
-                    "line": 123,
+                    "offset": 3725,
+                    "line": 131,
                     "column": 16
                   }
                 }
@@ -873,7 +873,7 @@
       }
     },
     "npm-web": {
-      "inventory_sha256": "d8c763ef77815e5db6d824d3a6f111bfaf78e615b54b899b7bd941a53cd734c0",
+      "inventory_sha256": "326f78488c1ea65b296122d62c7044c8a192b06a8b835d0aaf32a43738721043",
       "package_count": 129,
       "findings": {}
     }
