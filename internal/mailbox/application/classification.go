@@ -140,7 +140,8 @@ func (c *Classifier) Evaluate(ctx context.Context, account, entry string) (evalu
 	if len(samples) > 1000 {
 		return c.saveUnknown(ctx, account, input, "ALGORITHM", "TRAINING_LIMIT", nil)
 	}
-	prediction, failure := c.algorithm.Predict(ctx, samples, domain.ClassificationFeatures(input.FromAddress, input.Subject))
+	features := domain.ClassificationFeatures(input.FromAddress, input.Subject)
+	prediction, failure := c.algorithm.Predict(ctx, samples, features)
 	if failure != nil {
 		return c.saveUnknown(ctx, account, input, "ALGORITHM", "ALGORITHM_UNAVAILABLE", nil)
 	}
@@ -153,6 +154,10 @@ func (c *Classifier) Evaluate(ctx context.Context, account, entry string) (evalu
 	model := prediction.ModelVersion
 	if prediction.Confidence < .80 || prediction.Margin < .25 || prediction.MatchedFeatures == 0 {
 		return c.saveUnknown(ctx, account, input, "ALGORITHM", "LOW_CONFIDENCE", &model)
+	}
+	if !domain.HasClassificationEvidence(samples, features, *prediction.CategoryID) {
+		return c.saveUnknownReason(ctx, account, input, "ALGORITHM", "INSUFFICIENT_EVIDENCE",
+			"已命中特征不能区分预测类目与其他类目，保留未知；请手动分类或设置明确规则。", &model)
 	}
 	reason := fmt.Sprintf("本账户 %d 条确认历史，本地模型 %s，置信 %.1f%%，领先 %.1f%%", prediction.SampleCount, shortVersion(model), prediction.Confidence*100, prediction.Margin*100)
 	suggestion := domain.ClassificationSuggestion{ID: uuid.NewString(), EntryID: entry, CategoryID: prediction.CategoryID, Source: "ALGORITHM", Status: "PENDING", Confidence: prediction.Confidence, Margin: prediction.Margin, Reason: reason, ModelVersion: &model, EntryVersion: input.Version}
