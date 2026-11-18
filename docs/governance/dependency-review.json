@@ -1,6 +1,6 @@
 {
   "schema": "guihong-dependency-review/1",
-  "source_revision": "6ae84a692c3ad23cc17cde4f9caaf1cd3658adc5",
+  "source_revision": "eda190973c8b2bcc6c16c23d74efee7633e1d30e",
   "owner": "NoctilumeDev/GuiHongMail maintainers",
   "risk_accepted": false,
   "inputs": {
@@ -22,7 +22,7 @@
           "next_action": "单独的 Go 工具链维护待办：核对受损中间证书、系统信任库与实际 TLS 条件；本次静态符号链可达，实际部署暴露未验证。任何 HTTPS/公网支持前优先处置，升级须另行授权。"
         },
         "golang.org/x/crypto@v0.58.0/GO-2026-5932": {
-          "sha256": "871e76fa9512da08d7c9c3f197c4da83be1ce14be11b37b63255f6b26960b3da",
+          "sha256": "7d796b79bf95ab64c9a3d9a8f72c27d814dc32365717e8fb0fc92d9d6072f42b",
           "status": "UNRESOLVED",
           "source": "https://pkg.go.dev/vuln/GO-2026-5932",
           "evidence_level": "MODULE_VERSION",
@@ -34,6 +34,13 @@
           "source": "https://pkg.go.dev/vuln/GO-2025-4188",
           "evidence_level": "PACKAGE_IMPORTED",
           "next_action": "第二轮 RocketMQ 传递依赖专项：核对 Logrus Writer 路径及升级兼容性；本轮仅保留候选，不以未观察到符号链排除风险。"
+        },
+        "stdlib@v1.27.2/GO-2026-6859": {
+          "sha256": "0bc48de29f125b0ae812ebbc5092185cd27733f21aa95a96408cbf2d14d456b2",
+          "status": "UNRESOLVED",
+          "source": "https://pkg.go.dev/vuln/GO-2026-6859",
+          "evidence_level": "SYMBOL_TRACE",
+          "next_action": "Track separately as Go toolchain maintenance. Review the supported runtime conditions, qualify Go 1.27.4 or a later eligible patch with the original checks, and retain the prior scan evidence. Deployment applicability remains unverified."
         }
       }
     },
@@ -49,7 +56,7 @@
           "next_action": "第二轮 RocketMQ 传递依赖专项：核对 Logrus Writer 路径及升级兼容性；本轮仅保留候选，不以未观察到符号链排除风险。"
         },
         "golang.org/x/crypto@v0.58.0/GO-2026-5932": {
-          "sha256": "871e76fa9512da08d7c9c3f197c4da83be1ce14be11b37b63255f6b26960b3da",
+          "sha256": "7d796b79bf95ab64c9a3d9a8f72c27d814dc32365717e8fb0fc92d9d6072f42b",
           "status": "UNRESOLVED",
           "source": "https://pkg.go.dev/vuln/GO-2026-5932",
           "evidence_level": "MODULE_VERSION",
@@ -61,6 +68,13 @@
           "source": "https://pkg.go.dev/vuln/GO-2026-6809",
           "evidence_level": "SYMBOL_TRACE",
           "next_action": "单独的 Go 工具链维护待办：核对受损中间证书、系统信任库与实际 TLS 条件；本次静态符号链可达，实际部署暴露未验证。任何 HTTPS/公网支持前优先处置，升级须另行授权。"
+        },
+        "stdlib@v1.27.2/GO-2026-6859": {
+          "sha256": "0bc48de29f125b0ae812ebbc5092185cd27733f21aa95a96408cbf2d14d456b2",
+          "status": "UNRESOLVED",
+          "source": "https://pkg.go.dev/vuln/GO-2026-6859",
+          "evidence_level": "SYMBOL_TRACE",
+          "next_action": "Track separately as Go toolchain maintenance. Review the supported runtime conditions, qualify Go 1.27.4 or a later eligible patch with the original checks, and retain the prior scan evidence. Deployment applicability remains unverified."
         }
       }
     },
