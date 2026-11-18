@@ -108,15 +108,23 @@ def build():
         npm = shutil.which('npm.cmd', path=frontend_env.get('PATH'))
         if not node or not npm:
             raise RuntimeError(f'Node and npm are required on PATH; retained {log_path}')
-        versions = {}
-        for name, executable, expected in (('node', node, 'v24.22.3'), ('npm', npm, '11.9.0')):
-            result = subprocess.run([executable, '--version'], cwd=frontend, env=frontend_env,
-                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
-            output.write(result.stdout)
-            actual = result.stdout.decode('utf-8', errors='replace').strip()
-            if result.returncode or actual != expected:
-                raise RuntimeError(f'{name} {expected} is required on PATH; retained {log_path}')
-            versions[name] = actual
+        node_result = subprocess.run([node, '--version'], cwd=frontend, env=frontend_env,
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30)
+        output.write(node_result.stdout)
+        node_version = node_result.stdout.decode('utf-8', errors='replace').strip()
+        if node_result.returncode or node_version != 'v24.22.3':
+            raise RuntimeError(f'Node v24.22.3 is required on PATH; retained {log_path}')
+        npm_result = subprocess.run([npm, 'version', '--json'], cwd=frontend, env=frontend_env,
+                                    capture_output=True, timeout=30)
+        output.write(npm_result.stdout)
+        output.write(npm_result.stderr)
+        if npm_result.returncode:
+            raise RuntimeError(f'Cannot read npm runtime; retained {log_path}')
+        npm_versions = json.loads(npm_result.stdout)
+        if npm_versions.get('npm') != '11.9.0':
+            raise RuntimeError(f'npm 11.9.0 is required on PATH; retained {log_path}')
+        if npm_versions.get('node') != '24.22.3':
+            raise RuntimeError(f'npm must run on Node 24.22.3; retained {log_path}')
         for command in (['ci', '--ignore-scripts', '--proxy', 'http://127.0.0.1:7897',
                          '--https-proxy', 'http://127.0.0.1:7897'], ['test'], ['run', 'build']):
             result = subprocess.run([npm, *command], cwd=frontend, env=frontend_env,
@@ -154,7 +162,7 @@ def build():
     if not frontend_assets:
         raise RuntimeError('Frontend production build emitted no assets')
     receipt = {'schema': 'GuiHongGoBuildReceipt/1.0', 'source_sha': source, 'exit_code': 0,
-               'node_version': versions['node'], 'npm_version': versions['npm'],
+               'node_version': node_version, 'npm_version': npm_versions['npm'],
                'go_version': subprocess.check_output([str(GO), 'version'], text=True).strip(),
                'go_sum_sha256': hashlib.sha256((lab.ROOT / 'go.sum').read_bytes()).hexdigest(),
                'frontend_lock_sha256': hashlib.sha256((lab.ROOT / 'frontend/web/package-lock.json').read_bytes()).hexdigest(),

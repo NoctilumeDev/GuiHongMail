@@ -19,10 +19,11 @@ npm --version
 D:\python-3.10.6\python.exe -m venv .artifacts\lab-env
 .\.artifacts\lab-env\Scripts\python.exe -m pip install --require-hashes -r scripts\collector-requirements.lock
 $env:PATH='D:\DevTools\Go\go1.27.2\bin;'+$env:PATH
+$env:GUIHONG_TEST_PYTHON=(Resolve-Path '.artifacts\lab-env\Scripts\python.exe').Path
 .\.artifacts\lab-env\Scripts\python.exe scripts\go_apps.py build
 ```
 
-`build` 先核对 Node 与 npm 版本，再执行前端锁安装、前端测试与生产构建、Go 测试/vet/构建，并生成绑定 exact source 的不可覆盖 receipt。失败后保留原 attempt；源码不变时不会用第二份 receipt 覆盖它。
+`build` 先核对 Node、npm 和 npm 进程实际使用的 Node 版本，再执行前端锁安装、前端测试与生产构建、Go 测试/vet/构建，并生成绑定 exact source 的不可覆盖 receipt。失败后保留原 attempt；源码不变时不会用第二份 receipt 覆盖它。
 
 ## 首次启动
 
