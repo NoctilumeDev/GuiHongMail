@@ -5,7 +5,7 @@
 ## 固定前提
 
 - Docker Desktop 已可用；项目只创建带当前 `guihong-local-*` owner 的容器、网络和卷。
-- Go `1.27.2` 位于 `D:\DevTools\Go\go1.27.2`，Python `3.10.6` 位于 `D:\python-3.10.6`，Node 位于 `D:\Node.js\current`。
+- Go `1.27.2` 位于 `D:\DevTools\Go\go1.27.2`，Python `3.10.6` 位于 `D:\python-3.10.6`。在当前会话的 PATH 提供 Node `24.22.3` 与 npm `11.9.0`。
 - 依赖只安装到当前 checkout 的 `.artifacts` 和 `frontend/web/node_modules`。需要网络时仅给该命令显式设置 `HTTP_PROXY` / `HTTPS_PROXY=http://127.0.0.1:7897`。
 - 启动前至少 2 GiB 空闲、C 盘至少 10 GiB；运行中宿主占用大于 14 GiB 连续三次即停止 owned 实验。容器内存余量、PID、OOM 与应用 RSS 继续按资源合同 1.3。
 
@@ -14,13 +14,16 @@
 在 clean checkout 根目录依次执行：
 
 ```powershell
+node --version
+npm --version
 D:\python-3.10.6\python.exe -m venv .artifacts\lab-env
 .\.artifacts\lab-env\Scripts\python.exe -m pip install --require-hashes -r scripts\collector-requirements.lock
 $env:PATH='D:\DevTools\Go\go1.27.2\bin;'+$env:PATH
+$env:GUIHONG_TEST_PYTHON=(Resolve-Path '.artifacts\lab-env\Scripts\python.exe').Path
 .\.artifacts\lab-env\Scripts\python.exe scripts\go_apps.py build
 ```
 
-`build` 会执行前端锁安装、前端测试与生产构建、Go 测试/vet/构建，并生成绑定 exact source 的不可覆盖 receipt。失败后保留原 attempt；源码不变时不会用第二份 receipt 覆盖它。
+`build` 先核对 Node、npm 和 npm 进程实际使用的 Node 版本，再执行前端锁安装、前端测试与生产构建、Go 测试/vet/构建，并生成绑定 exact source 的不可覆盖 receipt。失败后保留原 attempt；源码不变时不会用第二份 receipt 覆盖它。
 
 ## 首次启动
 
